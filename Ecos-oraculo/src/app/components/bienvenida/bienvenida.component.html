@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bienvenue</title>
+  </head>
+  <body>
+    <div class="bienvenida-container">
+      <!-- Vidéo de fond -->
+      <div class="video-background">
+        <video
+          #backgroundVideo
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="auto"
+          [defaultMuted]="true"
+          webkit-playsinline
+        >
+          <source src="/fondo-home.mp4" type="video/mp4" />
+          Votre navigateur ne prend pas en charge les vidéos HTML5.
+        </video>
+      </div>
+
+      <!-- Overlay sombre pour améliorer la lisibilité -->
+      <div class="overlay"></div>
+
+      <!-- Contenu principal -->
+      <div class="content">
+        <!-- Section supérieure - Échos de l'Oracle -->
+        <div class="hero-section">
+          <div class="hero-content">
+            <h1 class="main-title">Échos de l'Oracle</h1>
+            <p class="description">
+              Découvrez ce que l'Oracle révèle sur vous.
+            </p>
+            <!--       <p class="description">Êtes-vous prêt à l'écouter ?</p> -->
+            <p class="services-text">
+              Interprétez vos rêves, explorez votre zodiaque et connectez-vous
+              avec votre énergie intérieure
+            </p>
+            <!--   <p class="services-text2">
+              Je vous invite à explorer nos services
+            </p>
+            <p class="call-to-action">
+              Tout commence par une simple question... osez
+              franchir le seuil.
+            </p> -->
+
+            <h2 class="services-title">Que voulez-vous savoir aujourd'hui ?</h2>
+          </div>
+          <div class="hero-symbol">
+            <!-- Ici vous pouvez ajouter le symbole mystique si vous avez l'image -->
+            <div class="mystic-symbol">
+              <img
+                src="/Oráculo Símbolo.webp"
+                alt="Symbole de l'Oracle"
+                class="rotating-logo"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Section inférieure - Services -->
+        <div class="services-section">
+          <div class="services-grid">
+            <!-- Carte 1 - Rêves -->
+            <div
+              class="service-card suenos-card"
+              (click)="navigateTo('/interpretation-reves')"
+            >
+              <div
+                class="card-background"
+                style="background-image: url('/SUENOS.webp')"
+              ></div>
+              <video class="card-video" muted loop playsinline>
+                <source src="/SUENOS.mp4" type="video/mp4" />
+              </video>
+              <div class="card-content">
+                <div class="service-icon">
+                  <img src="/Oráculo Servicio (1).svg" alt="Rêves" />
+                </div>
+                <span>Signification des Rêves</span>
+              </div>
+            </div>
+
+            <!-- Carte 2 - Zodiaque -->
+            <div
+              class="service-card zodiaco-card"
+              (click)="navigateTo('/information-zodiaque')"
+            >
+              <div
+                class="card-background"
+                style="background-image: url('/ZODIACO.webp')"
+              ></div>
+              <video class="card-video" muted loop playsinline>
+                <source src="/ZODIACO.mp4" type="video/mp4" />
+              </video>
+              <div class="card-content">
+                <div class="service-icon">
+                  <img src="/Oráculo Servicio (2)-1.svg" alt="Zodiaque" />
+                </div>
+                <span>Information du Zodiaque</span>
+              </div>
+            </div>
+
+            <!-- Carte 4 - Numérologie -->
+            <div
+              class="service-card numerologia-card"
+              (click)="navigateTo('/lecture-numerologie')"
+            >
+              <div
+                class="card-background"
+                style="background-image: url('/NUMEROLOGIA.webp')"
+              ></div>
+              <video class="card-video" muted loop playsinline>
+                <source src="/NUMEROLOGIA.mp4" type="video/mp4" />
+              </video>
+              <div class="card-content">
+                <div class="service-icon">
+                  <img src="/Oráculo Servicio (4).svg" alt="Numérologie" />
+                </div>
+                <span>Lecture de Numérologie</span>
+              </div>
+            </div>
+
+            <!-- Carte 5 - Carte Vocationale -->
+            <div
+              class="service-card vocacional-card"
+              (click)="navigateTo('/carte-vocationnelle')"
+            >
+              <div
+                class="card-background"
+                style="background-image: url('/MAPA-VOCACIONAL.webp')"
+              ></div>
+              <video class="card-video" muted loop playsinline>
+                <source src="/MAPA-VOCACIONAL.mp4" type="video/mp4" />
+              </video>
+              <div class="card-content">
+                <div class="service-icon">
+                  <img src="/Oráculo Servicio (5).svg" alt="Vocational" />
+                </div>
+                <span>Carte Vocationale</span>
+              </div>
+            </div>
+
+            <!-- Carte 6 - Animal Intérieur -->
+            <div
+              class="service-card animal-card"
+              (click)="navigateTo('/animal-interieur')"
+            >
+              <div
+                class="card-background"
+                style="background-image: url('/ANIMAL.webp')"
+              ></div>
+              <video class="card-video" muted loop playsinline>
+                <source src="/ANIMAL.mp4" type="video/mp4" />
+              </video>
+              <div class="card-content">
+                <div class="service-icon">
+                  <img src="/Oráculo Servicio (6).svg" alt="Animal" />
+                </div>
+                <span>Découvrez votre Animal Intérieur</span>
+              </div>
+            </div>
+
+            <!-- Carte 7 - Carte Natale -->
+            <div
+              class="service-card natal-card"
+              (click)="navigateTo('/tableau-naissance')"
+            >
+              <div
+                class="card-background"
+                style="background-image: url('/CARTA NATAL.webp')"
+              ></div>
+              <video class="card-video" muted loop playsinline>
+                <source src="/CARTANATAL.mp4" type="video/mp4" />
+              </video>
+              <div class="card-content">
+                <div class="service-icon">
+                  <img src="/Oráculo Servicio (7).svg" alt="Table Naissance" />
+                </div>
+                <span>Table de Naissance</span>
+              </div>
+            </div>
+
+            <!-- Carte 8 - Horoscope -->
+            <div
+              class="service-card horoscopo-card"
+              (click)="navigateTo('/horoscope')"
+            >
+              <div
+                class="card-background"
+                style="background-image: url('/HOROSCOPO.webp')"
+              ></div>
+              <video class="card-video" muted loop playsinline>
+                <source src="/HOROSCOPO.mp4" type="video/mp4" />
+              </video>
+              <div class="card-content">
+                <div class="service-icon">
+                  <img src="/Oráculo Servicio (9)-2.svg" alt="Horoscope" />
+                </div>
+                <span>Horoscope</span>
+              </div>
+            </div>
+
+            <!-- Carte 9 - Calculatrice de l'Amour -->
+            <div
+              class="service-card calculadora-card"
+              (click)="navigateTo('/calculateur-amour')"
+            >
+              <div
+                class="card-background"
+                style="background-image: url('/CALCULADORA.webp')"
+              ></div>
+              <video class="card-video" muted loop playsinline>
+                <source src="/CALCULADORA.mp4" type="video/mp4" />
+              </video>
+              <div class="card-content">
+                <div class="service-icon">
+                  <img
+                    src="/Oráculo Servicio (8)-1.svg"
+                    alt="Calculatrice Amour"
+                  />
+                </div>
+                <span>Calculatrice de l'Amour</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="footer-section">
+        <div class="footer-content">
+          <!-- Logo et nom -->
+          <div class="footer-logo">
+            <img
+              src="/Ecos del Oráculo Logo-1.svg"
+              alt="Échos de l'Oracle"
+              class="logo-image"
+            />
+            <h3 class="footer-title">Échos de l'Oracle</h3>
+          </div>
+
+          <!-- Informations de contact -->
+          <div class="footer-contact">
+            <div class="contact-item">
+              <i class="fas fa-envelope contact-icon"></i>
+              <span class="contact-text">oraculosabina&#64;gmail.com</span>
+            </div>
+
+            <!-- Réseaux sociaux -->
+            <div class="social-links">
+              <a
+                href="https://www.instagram.com/ecos_del_oraculo/"
+                class="social-link instagram"
+                aria-label="Instagram"
+              >
+                <i class="fab fa-instagram"></i>
+              </a>
+              <a
+                href="https://www.facebook.com/profile.php?id=61578154780521&locale=es_LA"
+                class="social-link facebook"
+                aria-label="Facebook"
+              >
+                <i class="fab fa-facebook-f"></i>
+              </a>
+              <a
+                href="https://www.tiktok.com/@ecosdeloraculo"
+                class="social-link tiktok"
+                aria-label="TikTok"
+              >
+                <i class="fab fa-tiktok"></i>
+              </a>
+            </div>
+
+            <!-- Prix sous les réseaux sociaux -->
+            <div class="footer-price">
+              <span class="price-text">Consultations à partir de 4.00€ </span>
+            </div>
+          </div>
+          <!-- ✅ AJOUTER : Boîte à suggestions - TROISIÈME COLONNE -->
+          <div class="suggestion-box">
+            <div class="suggestion-wrapper">
+              <h4 class="suggestion-title">Boîte à Suggestions</h4>
+
+              <div class="suggestion-form">
+                <!-- Input de texte -->
+                <div class="suggestion-input-container">
+                  <textarea
+                    class="suggestion-input"
+                    placeholder="Écrivez votre suggestion ici..."
+                    [(ngModel)]="sugerenciaTexto"
+                    [disabled]="enviandoSugerencia"
+                    maxlength="1000"
+                    rows="3"
+                  ></textarea>
+                </div>
+
+                <!-- Compteur de caractères -->
+                <div
+                  class="character-counter"
+                  *ngIf="sugerenciaTexto && sugerenciaTexto.length > 0"
+                >
+                  {{ sugerenciaTexto.length }}/1000 caractères
+                </div>
+
+                <!-- Bouton d'envoi -->
+                <button
+                  class="suggestion-button"
+                  [disabled]="
+                    enviandoSugerencia ||
+                    !sugerenciaTexto ||
+                    sugerenciaTexto.trim().length === 0
+                  "
+                  (click)="enviarSugerencia()"
+                >
+                  <span *ngIf="!enviandoSugerencia">
+                    <i class="fas fa-paper-plane"></i>
+                    Envoyer Suggestion
+                  </span>
+                  <span *ngIf="enviandoSugerencia">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Envoi en cours...
+                  </span>
+                </button>
+
+                <!-- Message de confirmation -->
+                <div
+                  *ngIf="mensajeSugerencia"
+                  class="suggestion-message"
+                  [ngClass]="'message-' + mensajeSugerencia.tipo"
+                >
+                  <i
+                    class="fas"
+                    [ngClass]="{
+                      'fa-check-circle': mensajeSugerencia.tipo === 'success',
+                      'fa-exclamation-circle':
+                        mensajeSugerencia.tipo === 'error'
+                    }"
+                  ></i>
+                  {{ mensajeSugerencia.texto }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
+      <div class="cookie-banner" *ngIf="showCookieBanner">
+        <div class="cookie-content">
+          <div class="cookie-icon">
+            <img
+              src="/Ecos del Oráculo Logo-1.svg"
+              alt="Échos de l'Oracle"
+              class="cookie-icon"
+            />
+          </div>
+          <div class="cookie-text">
+            <h4>Échos de l'Oracle utilise des cookies</h4>
+            <p>
+              Pour personnaliser votre expérience spirituelle et mémoriser vos
+              préférences astrales. Les cookies nous aident à vous offrir un
+              contenu plus pertinent.
+            </p>
+          </div>
+          <div class="cookie-buttons">
+            <button class="btn-accept" (click)="acceptCookies()">
+              ✨ Accepter et Continuer
+            </button>
+            <button class="btn-reject" (click)="acceptCookies()">
+              Refuser
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
