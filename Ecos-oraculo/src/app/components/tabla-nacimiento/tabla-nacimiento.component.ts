@@ -572,7 +572,7 @@ Quel aspect de ton thème natal aimerais-tu explorer en premier?`,
 
     try {
       await this.paypalService.initiatePayment({
-        amount: '5.00',
+        amount: '4.00',
         currency: 'EUR',
         serviceName: 'Tableau de Naissance',
         returnPath: '/tableau-naissance',

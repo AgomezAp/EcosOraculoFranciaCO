@@ -703,7 +703,7 @@ export class CalculadoraAmorComponent
 
     try {
       await this.paypalService.initiatePayment({
-        amount: '5.00',
+        amount: '4.00',
         currency: 'EUR',
         serviceName: "Calculatrice de l'amour",
         returnPath: '/calculateur-amour',
