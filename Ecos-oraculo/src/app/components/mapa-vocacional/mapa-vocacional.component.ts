@@ -727,7 +727,7 @@ export class MapaVocacionalComponent
       // Configurar datos de la orden con rutas específicas del servicio
       const orderData = {
         amount: '4.00',
-        currency: 'USD',
+        currency: 'EUR',
         serviceName: 'Carte Vocationnelle',
         returnPath: '/carte-vocationnelle',
         cancelPath: '/carte-vocationnelle',
