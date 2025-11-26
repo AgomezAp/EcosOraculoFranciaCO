@@ -157,19 +157,19 @@ export class AnimalInteriorComponent
             window.location.pathname
           );
 
-          this.addMessage({
+            this.addMessage({
             sender: this.guideData.name,
             content:
-              '✨ Zahlung bestätigt! Jetzt kannst du auf all meine Erfahrung zugreifen.',
+              '✨ Paiement confirmé ! Tu peux maintenant accéder à toute ma sagesse et expérience.',
             timestamp: new Date(),
             isUser: false,
-          });
+            });
 
           this.cdr.markForCheck();
         }
       } catch (error) {
         console.error('Error verificando pago de PayPal:', error);
-        this.paymentError = 'Fehler bei der Zahlungsüberprüfung';
+        this.paymentError = 'Erreur lors de la vérification du paiement';
       }
     }
 
@@ -615,7 +615,7 @@ Was möchtest du über deinen Tiergeist erkunden?`,
 
     if (missingFields.length > 0) {
       alert(
-        `Um mit der Zahlung fortzufahren, musst du folgendes ausfüllen: ${missingFields.join(
+        `Pour continuer avec le paiement, vous devez remplir les champs suivants : ${missingFields.join(
           ', '
         )}`
       );

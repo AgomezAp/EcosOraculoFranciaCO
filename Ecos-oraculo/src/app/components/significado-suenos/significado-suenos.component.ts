@@ -186,7 +186,7 @@ export class SignificadoSuenosComponent
             setTimeout(() => this.scrollToBottom(), 200);
           }, 1000);
         } else {
-          this.paymentError = 'Die Zahlung konnte nicht verifiziert werden.';
+            this.paymentError = "Le paiement n'a pas pu être vérifié.";
 
           setTimeout(() => {
             const errorMessage: ConversationMessage = {
