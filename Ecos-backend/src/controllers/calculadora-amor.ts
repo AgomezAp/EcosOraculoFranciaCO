@@ -27,9 +27,13 @@ export class LoveCalculatorController {
 
   // ✅ LISTE DES MODÈLES DE SECOURS (par ordre de préférence)
   private readonly MODELS_FALLBACK = [
-    "gemini-2.0-flash-exp",
+    "gemini-2.5-flash-live",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-preview-09-2025",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash-lite-preview-09-2025",
     "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
   ];
 
   constructor() {
@@ -46,7 +50,9 @@ export class LoveCalculatorController {
     userMessage: string
   ): void {
     if (!loveCalculatorData) {
-      const error: ApiError = new Error("Données de l'expert en amour requises");
+      const error: ApiError = new Error(
+        "Données de l'expert en amour requises"
+      );
       error.statusCode = 400;
       error.code = "MISSING_LOVE_CALCULATOR_DATA";
       throw error;
@@ -79,7 +85,10 @@ export class LoveCalculatorController {
     const conversationContext =
       history && history.length > 0
         ? `\n\nCONVERSATION PRÉCÉDENTE:\n${history
-            .map((h) => `${h.role === "user" ? "Utilisateur" : "Toi"}: ${h.message}`)
+            .map(
+              (h) =>
+                `${h.role === "user" ? "Utilisateur" : "Toi"}: ${h.message}`
+            )
             .join("\n")}\n`
         : "";
 
@@ -342,7 +351,10 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
 
       // ✅ Si tous les modèles ont échoué
       if (!text || text.trim() === "") {
-        console.error("❌ Tous les modèles ont échoué. Erreurs :", allModelErrors);
+        console.error(
+          "❌ Tous les modèles ont échoué. Erreurs :",
+          allModelErrors
+        );
         throw new Error(
           `Tous les modèles d'IA ne sont pas disponibles actuellement. Tentés : ${this.MODELS_FALLBACK.join(
             ", "
