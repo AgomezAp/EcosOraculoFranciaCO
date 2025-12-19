@@ -43,15 +43,14 @@
         style="display: none; visibility: hidden"
       ></iframe
     ></noscript>
-    <!-- End Google Tag Manager (noscript) -->
     <video autoplay muted loop playsinline class="background-video">
       <source src="/CALCULADORA.mp4" type="video/mp4" />
       Votre navigateur ne prend pas en charge les vidéos HTML5.
     </video>
 
-    <!-- Overlay optionnel pour améliorer la lisibilité -->
+    <!-- Overlay opcional para mejorar legibilidad -->
     <div class="video-overlay"></div>
-    <!-- Contenu principal -->
+    <!-- Contenido principal -->
     <div class="main-content">
       <div class="love-calculator-modal">
         <!-- Header -->
@@ -61,11 +60,11 @@
               <img
                 class="mystical-orb-image"
                 src="/Maestra-9.webp"
-                alt="Avatar Maîtresse"
+                alt="Avatar de la Maîtresse"
               />
             </div>
             <div class="expert-details" *ngIf="loveExpertInfo">
-              <!-- Première ligne : nom + icône + titre ensemble -->
+              <!-- Primera línea: nombre + icono + título juntos -->
               <div class="name-title-row">
                 <h3>{{ loveExpertInfo.loveExpert.name }}</h3>
                 <span class="separator-icon">»</span>
@@ -73,9 +72,9 @@
                   {{ loveExpertInfo.loveExpert.title }}
                 </p>
               </div>
-              <!-- Deuxième ligne : spécialité dessous EN MAJUSCULES -->
+              <!-- Segunda línea: especialidad debajo EN MAYÚSCULAS -->
               <p class="interpreter-specialty">
-                Canalistrice de l'amour universel et numérologie amoureuse
+                Canalisatrice de l'amour universel et numérologie amoureuse
               </p>
             </div>
           </div>
@@ -97,7 +96,7 @@
 
         <!-- Chat Messages -->
         <div class="chat-messages" #scrollContainer (scroll)="onScroll($event)">
-          <!-- Modifie la structure du message pour déplacer l'heure à l'intérieur du message-text -->
+          <!-- Modifica la estructura del mensaje para mover la hora dentro del message-text -->
           <div
             *ngFor="let message of conversationHistory; trackBy: trackByMessage"
             class="message"
@@ -111,7 +110,7 @@
                 *ngIf="message.role === 'love_expert'"
                 class="interpreter-avatar-small"
                 src="/Maestra-9.webp"
-                alt="Avatar Maîtresse"
+                alt="Avatar de la Maîtresse"
               />
             </div>
 
@@ -121,7 +120,7 @@
             >
               <div class="message-text">
                 <div [innerHTML]="formatMessage(message.message)"></div>
-                <!-- DÉPLACER L'HEURE À L'INTÉRIEUR DU message-text -->
+                <!-- MOVER LA HORA DENTRO DEL message-text -->
                 <span
                   class="message-time"
                   *ngIf="
@@ -132,13 +131,13 @@
                 </span>
               </div>
 
-              <!-- Overlay pour messages bloqués -->
+              <!-- Overlay para mensajes bloqueados -->
               <div *ngIf="isMessageBlocked(message)" class="blocked-overlay">
                 <div class="blocked-message">
                   <mat-icon>lock</mat-icon>
-                  <p>Contenu bloqué</p>
+                  <p>Contenu verrouillé</p>
                   <small
-                    >Effectuez le paiement pour voir cette réponse
+                    >Effectue le paiement pour voir cette réponse
                     complète</small
                   >
                   <button
@@ -169,7 +168,7 @@
                 <img
                   class="interpreter-avatar-small"
                   src="/Maestra-9.webp"
-                  alt="Avatar Maîtresse"
+                  alt="Avatar de la Maîtresse"
                 />
               </span>
             </div>
@@ -180,9 +179,9 @@
                   <span></span>
                   <span></span>
                 </div>
-                <!-- DÉPLACER LE TEXTE À L'INTÉRIEUR DE loading-dots -->
+                <!-- MOVER EL TEXTO DENTRO DE loading-dots -->
                 <span class="loading-text">
-                  Maîtresse Valentina consulte les chiffres de l'amour...
+                  Maîtresse Valentina consulte les nombres de l'amour...
                 </span>
               </div>
             </div>
@@ -208,7 +207,7 @@
           <div class="message-input">
             <textarea
               #messageTextarea
-              placeholder="Demandez sur l'amour et la compatibilité..."
+              placeholder="Pose ta question sur l'amour et la compatibilité..."
               [(ngModel)]="currentMessage"
               (input)="adjustTextareaHeight($event)"
               (keydown.enter)="onEnterPressed($any($event))"
@@ -219,7 +218,7 @@
               class="character-count"
               *ngIf="(currentMessage.length || 0) > 800"
             >
-              {{ currentMessage || 0 }}/1000
+              {{ currentMessage.length || 0 }}/1000
             </div>
           </div>
 
@@ -229,7 +228,7 @@
               class="reset-button"
               (click)="resetChat()"
               [disabled]="isLoading"
-              matTooltip="Redémarrer le chat"
+              matTooltip="Réinitialiser le chat"
               matTooltipPosition="above"
             >
               <i class="fas fa-redo"></i>
@@ -257,7 +256,7 @@
       </app-recolecta-datos>
     </div>
 
-    <!-- Modal de Paiement -->
+    <!-- Modal de Pago -->
     <div
       *ngIf="showPaymentModal"
       class="payment-modal-overlay"
@@ -280,14 +279,14 @@
             <div class="pricing">
               <div class="price">
                 <span class="currency">€</span>
-                <span class="amount">4.00</span>
-                <span class="period">une seule fois</span>
+                <span class="amount">4,00</span>
+                <span class="period">paiement unique</span>
               </div>
-              <p class="price-note">Paiement unique pour accès illimité</p>
+              <p class="price-note">Paiement unique pour un accès illimité</p>
             </div>
           </div>
 
-          <!-- Conteneur de l'élément de paiement Stripe -->
+          <!-- Contenedor del elemento de pago de Stripe -->
           <div class="payment-form-container">
             <div *ngIf="isProcessingPayment" class="payment-loading">
               <mat-spinner diameter="40"></mat-spinner>
@@ -319,7 +318,9 @@
             ></mat-spinner>
             <mat-icon *ngIf="!isProcessingPayment">payment</mat-icon>
             {{
-              isProcessingPayment ? "Traitement..." : "Effectuer le Paiement"
+              isProcessingPayment
+                ? "Traitement en cours..."
+                : "Effectuer le paiement"
             }}
           </button>
           <button
@@ -332,13 +333,5 @@
         </div>
       </div>
     </div>
-    <app-fortune-wheel
-      *ngIf="showFortuneWheel"
-      [isVisible]="showFortuneWheel"
-      [prizes]="lovePrizes"
-      (onPrizeWon)="onPrizeWon($event)"
-      (onWheelClosed)="onWheelClosed()"
-    >
-    </app-fortune-wheel>
   </body>
 </html>

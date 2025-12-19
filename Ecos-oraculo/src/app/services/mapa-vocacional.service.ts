@@ -1,40 +1,57 @@
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, map, Observable, throwError } from 'rxjs';
-import { environment } from '../environments/environments';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { catchError, map, Observable, of, timeout } from 'rxjs';
+import { environment } from '../environments/environmets.prod';
 
+// ✅ Interface pour les données du conseiller d'orientation
 interface VocationalData {
   name: string;
+  title?: string;
   specialty: string;
   experience: string;
 }
 
-interface VocationalRequest {
+// ✅ Interface du Request - EXPORTÉE
+export interface VocationalRequest {
   vocationalData: VocationalData;
   userMessage: string;
-  personalInfo?: {
-    age?: number;
-    currentEducation?: string;
-    workExperience?: string;
-    interests?: string[];
-  };
-  assessmentAnswers?: Array<{
-    question: string;
-    answer: string;
-    category: string;
-  }>;
+  personalInfo?: any;
+  assessmentAnswers?: any[];
   conversationHistory?: Array<{
     role: 'user' | 'counselor';
     message: string;
   }>;
+  // ✅ NOUVEAUX CHAMPS pour le système de 3 messages gratuits
+  messageCount?: number;
+  isPremiumUser?: boolean;
 }
 
-interface VocationalResponse {
+// ✅ Interface du Response - EXPORTÉE
+export interface VocationalResponse {
   success: boolean;
   response?: string;
   error?: string;
   code?: string;
   timestamp?: string;
+  // ✅ NOUVEAUX CHAMPS retournés par le backend
+  freeMessagesRemaining?: number;
+  showPaywall?: boolean;
+  paywallMessage?: string;
+  isCompleteResponse?: boolean;
+}
+
+// ✅ Interface pour les informations du conseiller - EXPORTÉE
+export interface CounselorInfo {
+  success: boolean;
+  counselor: {
+    name: string;
+    title: string;
+    specialty: string;
+    description: string;
+    services: string[];
+  };
+  freeMessagesLimit?: number;
+  timestamp: string;
 }
 
 interface AssessmentQuestion {
@@ -47,17 +64,10 @@ interface AssessmentQuestion {
   }>;
 }
 
-interface AssessmentQuestionsResponse {
-  success: boolean;
-  questions: AssessmentQuestion[];
-  instructions: string;
-  timestamp: string;
-}
-
-interface CategoryAnalysis {
+interface AssessmentAnswer {
+  question: string;
+  answer: string;
   category: string;
-  count: number;
-  percentage: number;
 }
 
 interface VocationalProfile {
@@ -67,385 +77,480 @@ interface VocationalProfile {
   workEnvironments: string[];
 }
 
-interface AnalysisResult {
-  profileDistribution: CategoryAnalysis[];
-  dominantProfile: VocationalProfile;
-  recommendations: string[];
-}
-
-interface AnalysisResponse {
-  success: boolean;
-  analysis: AnalysisResult;
-  timestamp: string;
-}
-
-interface CounselorInfo {
-  name: string;
-  title: string;
-  specialty: string;
-  description: string;
-  services: string[];
-  methodology: string[];
-}
-
-interface CounselorInfoResponse {
-  success: boolean;
-  counselor: CounselorInfo;
-  timestamp: string;
-}
-
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class MapaVocacionalService {
-  // ✅ CORREGIR: Usar solo la URL base
-  private readonly API_URL = environment.apiUrl;
+  private appUrl: string;
+  private apiUrl: string;
 
-  private readonly httpOptions = {
-    headers: new HttpHeaders({
-      'Content-Type': 'application/json',
-    }),
+  // Données par défaut du conseiller d'orientation
+  private defaultVocationalData: VocationalData = {
+    name: 'Dr. Valérie',
+    title: 'Spécialiste en Orientation Professionnelle',
+    specialty: 'Orientation professionnelle et lettres de carrière personnalisées',
+    experience:
+      'Des années d\'expérience en orientation professionnelle et développement de carrière',
   };
 
-  constructor(private http: HttpClient) {}
+  // Profils professionnels
+  private vocationalProfiles: { [key: string]: VocationalProfile } = {
+    realistic: {
+      name: 'Réaliste',
+      description:
+        'Préfère les activités pratiques et travailler avec des outils, des machines ou des animaux.',
+      characteristics: ['Pratique', 'Mécanicien', 'Athlétique', 'Direct'],
+      workEnvironments: [
+        'Plein air',
+        'Ateliers',
+        'Laboratoires',
+        'Construction',
+      ],
+    },
+    investigative: {
+      name: 'Investigateur',
+      description:
+        'Aime résoudre des problèmes complexes et mener des recherches.',
+      characteristics: ['Analytique', 'Curieux', 'Indépendant', 'Réservé'],
+      workEnvironments: [
+        'Laboratoires',
+        'Universités',
+        'Centres de recherche',
+      ],
+    },
+    artistic: {
+      name: 'Artistique',
+      description:
+        'Valorise l\'expression personnelle, la créativité et le travail non structuré.',
+      characteristics: ['Créatif', 'Original', 'Indépendant', 'Expressif'],
+      workEnvironments: ['Studios', 'Théâtres', 'Agences créatives', 'Musées'],
+    },
+    social: {
+      name: 'Social',
+      description: 'Préfère travailler avec les gens, aider et enseigner.',
+      characteristics: ['Coopératif', 'Empathique', 'Patient', 'Généreux'],
+      workEnvironments: [
+        'Écoles',
+        'Hôpitaux',
+        'ONG',
+        'Services sociaux',
+      ],
+    },
+    enterprising: {
+      name: 'Entrepreneur',
+      description:
+        'Aime diriger, persuader et prendre des décisions commerciales.',
+      characteristics: ['Ambitieux', 'Énergique', 'Dominant', 'Optimiste'],
+      workEnvironments: ['Entreprises', 'Ventes', 'Politique', 'Startups'],
+    },
+    conventional: {
+      name: 'Conventionnel',
+      description:
+        'Préfère les activités ordonnées, en suivant des procédures établies.',
+      characteristics: ['Organisé', 'Précis', 'Efficace', 'Pratique'],
+      workEnvironments: [
+        'Bureaux',
+        'Banques',
+        'Comptabilité',
+        'Administration',
+      ],
+    },
+  };
+
+  constructor(private http: HttpClient) {
+    this.appUrl = environment.apiUrl;
+    this.apiUrl = 'api/vocational';
+  }
 
   /**
-   * Envía un mensaje al consejero vocacional
+   * ✅ MÉTHODE PRINCIPALE : Envoyer un message avec compteur de messages
+   */
+  sendMessageWithCount(
+    userMessage: string,
+    messageCount: number,
+    isPremiumUser: boolean,
+    personalInfo?: any,
+    assessmentAnswers?: any[],
+    conversationHistory?: Array<{ role: 'user' | 'counselor'; message: string }>
+  ): Observable<VocationalResponse> {
+    const request: VocationalRequest = {
+      vocationalData: this.defaultVocationalData,
+      userMessage: userMessage.trim(),
+      personalInfo,
+      assessmentAnswers,
+      conversationHistory,
+      messageCount,
+      isPremiumUser,
+    };
+
+    console.log('📤 Envoi du message d\'orientation :', {
+      messageCount: request.messageCount,
+      isPremiumUser: request.isPremiumUser,
+      userMessage: request.userMessage.substring(0, 50) + '...',
+    });
+
+    return this.http
+      .post<VocationalResponse>(`${this.appUrl}${this.apiUrl}/counselor`, request)
+      .pipe(
+        timeout(60000),
+        map((response: VocationalResponse) => {
+          console.log('📥 Réponse d\'orientation :', {
+            success: response.success,
+            freeMessagesRemaining: response.freeMessagesRemaining,
+            showPaywall: response.showPaywall,
+            isCompleteResponse: response.isCompleteResponse,
+          });
+
+          if (response.success) {
+            return response;
+          }
+          throw new Error(response.error || 'Réponse invalide du serveur');
+        }),
+        catchError((error: HttpErrorResponse) => {
+          console.error('Erreur de communication d\'orientation :', error);
+          return of({
+            success: false,
+            error: this.getErrorMessage(error),
+            timestamp: new Date().toISOString(),
+          } as VocationalResponse);
+        })
+      );
+  }
+
+  /**
+   * Méthode legacy pour compatibilité
    */
   sendMessage(
     userMessage: string,
     personalInfo?: any,
     assessmentAnswers?: any[],
-    conversationHistory?: Array<{role: 'user' | 'counselor', message: string}>
+    conversationHistory?: Array<{ role: 'user' | 'counselor'; message: string }>
   ): Observable<string> {
-    const counselorData: VocationalData = {
-      name: "Dr. Mentor Vocationis",
-      specialty: "Orientación profesional y mapas vocacionales personalizados",
-      experience: "Décadas de experiencia en psicología vocacional"
-    };
-
-    const requestBody: VocationalRequest = {
-      vocationalData: counselorData,
-      userMessage,
+    const request: VocationalRequest = {
+      vocationalData: this.defaultVocationalData,
+      userMessage: userMessage.trim(),
       personalInfo,
       assessmentAnswers,
-      conversationHistory
+      conversationHistory,
+      messageCount: 1,
+      isPremiumUser: false,
     };
 
-    // ✅ CORREGIR: URL exacta según backend
-    return this.http.post<VocationalResponse>(
-      `${this.API_URL}api/vocational/counselor`,
-      requestBody,
-      this.httpOptions
-    ).pipe(
-      map((response:any) => {
-        if (response.success && response.response) {
-          return response.response;
-        } else {
-          throw new Error(response.error || 'Error desconocido del consejero vocacional');
-        }
-      }),
-      catchError(this.handleError)
-    );
+    return this.http
+      .post<VocationalResponse>(`${this.appUrl}${this.apiUrl}/counselor`, request)
+      .pipe(
+        timeout(30000),
+        map((response: VocationalResponse) => {
+          if (response.success && response.response) {
+            return response.response;
+          }
+          throw new Error(response.error || 'Réponse invalide du serveur');
+        }),
+        catchError((error: HttpErrorResponse) => {
+          console.error('Erreur de communication d\'orientation :', error);
+          return of(this.getErrorMessage(error));
+        })
+      );
   }
 
   /**
-   * Obtiene información del consejero vocacional
-   */
-  getCounselorInfo(): Observable<CounselorInfo> {
-    // ✅ CORREGIR: URL exacta según backend
-    return this.http.get<CounselorInfoResponse>(
-      `${this.API_URL}/api/vocational/counselor/info`,
-      this.httpOptions
-    ).pipe(
-      map((response:any) => {
-        if (response.success && response.counselor) {
-          return response.counselor;
-        } else {
-          throw new Error('Error al obtener información del consejero');
-        }
-      }),
-      catchError(this.handleError)
-    );
-  }
-
-  /**
-   * Obtiene las preguntas del assessment vocacional
+   * Obtenir les questions de l'évaluation
    */
   getAssessmentQuestions(): Observable<AssessmentQuestion[]> {
-    // ✅ CORREGIR: URL exacta según backend
-    return this.http.get<AssessmentQuestionsResponse>(
-      `${this.API_URL}api/vocational/assessment/questions`,
-      this.httpOptions
-    ).pipe(
-      map((response:any) => {
-        if (response.success && response.questions) {
-          return response.questions;
-        } else {
-          throw new Error('Error al obtener preguntas del assessment');
-        }
-      }),
-      catchError(this.handleError)
-    );
+    return of(this.getDefaultQuestions());
   }
 
   /**
-   * Analiza las respuestas del assessment vocacional
+   * Analyser les réponses de l'évaluation
    */
-  analyzeAssessment(answers: Array<{question: string, answer: string, category: string}>): Observable<AnalysisResult> {
-    const requestBody = { answers };
+  analyzeAssessment(answers: AssessmentAnswer[]): Observable<any> {
+    const categoryCount: { [key: string]: number } = {};
 
-    // ✅ CORREGIR: URL exacta según backend
-    return this.http.post<AnalysisResponse>(
-      `${this.API_URL}api/vocational/assessment/analyze`,
-      requestBody,
-      this.httpOptions
-    ).pipe(
-      map((response:any) => {
-        if (response.success && response.analysis) {
-          return response.analysis;
-        } else {
-          throw new Error('Error al analizar el assessment');
-        }
-      }),
-      catchError(this.handleError)
-    );
+    answers.forEach((answer) => {
+      if (answer.category) {
+        categoryCount[answer.category] =
+          (categoryCount[answer.category] || 0) + 1;
+      }
+    });
+
+    const total = answers.length;
+    const distribution = Object.entries(categoryCount)
+      .map(([category, count]) => ({
+        category,
+        count,
+        percentage: Math.round((count / total) * 100),
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const dominantCategory = distribution[0]?.category || 'social';
+    const dominantProfile =
+      this.vocationalProfiles[dominantCategory] ||
+      this.vocationalProfiles['social'];
+
+    return of({
+      profileDistribution: distribution,
+      dominantProfile,
+      recommendations: this.getRecommendations(dominantCategory),
+    });
   }
 
   /**
-   * Prueba la conexión con el servicio vocacional
+   * Obtenir l'emoji de la catégorie
    */
-  testConnection(): Observable<any> {
-    // ✅ CORREGIR: URL exacta según backend
-    return this.http.get(`${this.API_URL}api/vocational/test`).pipe(
-      catchError(this.handleError)
-    );
-  }
-
-  /**
-   * Obtiene recomendaciones de carrera basadas en una categoría
-   */
-  getCareerRecommendations(category: string): string[] {
-    const recommendations: Record<string, string[]> = {
-      social: [
-        "Psicología y Terapia",
-        "Educación y Docencia",
-        "Trabajo Social",
-        "Recursos Humanos",
-        "Enfermería y Salud",
-        "Orientación Vocacional"
-      ],
-      investigativo: [
-        "Ingeniería en sus diversas ramas",
-        "Medicina e Investigación Médica",
-        "Ciencias de la Computación",
-        "Investigación Científica",
-        "Análisis de Datos",
-        "Arquitectura"
-      ],
-      artístico: [
-        "Diseño Gráfico y Web",
-        "Arquitectura y Diseño de Interiores",
-        "Comunicación Social y Periodismo",
-        "Artes Visuales y Escénicas",
-        "Marketing Creativo",
-        "Producción Audiovisual"
-      ],
-      emprendedor: [
-        "Administración de Empresas",
-        "Marketing y Ventas",
-        "Finanzas y Banca",
-        "Derecho Empresarial",
-        "Comercio Internacional",
-        "Consultoría"
-      ],
-      convencional: [
-        "Contabilidad y Auditoría",
-        "Administración Pública",
-        "Gestión de Operaciones",
-        "Sistemas de Información",
-        "Logística y Cadena de Suministro",
-        "Finanzas"
-      ],
-      realista: [
-        "Ingeniería Mecánica y Civil",
-        "Arquitectura",
-        "Agricultura y Veterinaria",
-        "Tecnología Industrial",
-        "Oficios Especializados",
-        "Ciencias Ambientales"
-      ]
+  getCategoryEmoji(category: string): string {
+    const emojis: { [key: string]: string } = {
+      realistic: '🔧',
+      investigative: '🔬',
+      artistic: '🎨',
+      social: '🤝',
+      enterprising: '💼',
+      conventional: '📊',
     };
+    return emojis[category] || '⭐';
+  }
 
+  /**
+   * Obtenir la couleur de la catégorie
+   */
+  getCategoryColor(category: string): string {
+    const colors: { [key: string]: string } = {
+      realistic: '#4CAF50',
+      investigative: '#2196F3',
+      artistic: '#9C27B0',
+      social: '#FF9800',
+      enterprising: '#F44336',
+      conventional: '#607D8B',
+    };
+    return colors[category] || '#757575';
+  }
+
+  /**
+   * Obtenir les questions par défaut
+   */
+  private getDefaultQuestions(): AssessmentQuestion[] {
+    return [
+      {
+        id: 1,
+        question:
+          'Quel type d\'activité préférez-vous faire pendant votre temps libre ?',
+        options: [
+          {
+            value: 'a',
+            label: 'Construire ou réparer des choses',
+            category: 'realistic',
+          },
+          {
+            value: 'b',
+            label: 'Lire et rechercher de nouveaux sujets',
+            category: 'investigative',
+          },
+          { value: 'c', label: 'Créer de l\'art ou de la musique', category: 'artistic' },
+          { value: 'd', label: 'Aider les autres', category: 'social' },
+          {
+            value: 'e',
+            label: 'Organiser des événements ou diriger des groupes',
+            category: 'enterprising',
+          },
+          {
+            value: 'f',
+            label: 'Organiser et classer des informations',
+            category: 'conventional',
+          },
+        ],
+      },
+      {
+        id: 2,
+        question:
+          'Dans quel type d\'environnement de travail vous sentiriez-vous le plus à l\'aise ?',
+        options: [
+          {
+            value: 'a',
+            label: 'En plein air ou dans un atelier',
+            category: 'realistic',
+          },
+          {
+            value: 'b',
+            label: 'Dans un laboratoire ou un centre de recherche',
+            category: 'investigative',
+          },
+          { value: 'c', label: 'Dans un studio créatif', category: 'artistic' },
+          {
+            value: 'd',
+            label: 'Dans une école ou un hôpital',
+            category: 'social',
+          },
+          {
+            value: 'e',
+            label: 'Dans une entreprise ou une startup',
+            category: 'enterprising',
+          },
+          {
+            value: 'f',
+            label: 'Dans un bureau bien organisé',
+            category: 'conventional',
+          },
+        ],
+      },
+      {
+        id: 3,
+        question: 'Laquelle de ces compétences vous décrit le mieux ?',
+        options: [
+          {
+            value: 'a',
+            label: 'Habileté manuelle et technique',
+            category: 'realistic',
+          },
+          {
+            value: 'b',
+            label: 'Pensée analytique',
+            category: 'investigative',
+          },
+          {
+            value: 'c',
+            label: 'Créativité et imagination',
+            category: 'artistic',
+          },
+          { value: 'd', label: 'Empathie et communication', category: 'social' },
+          {
+            value: 'e',
+            label: 'Leadership et persuasion',
+            category: 'enterprising',
+          },
+          {
+            value: 'f',
+            label: 'Organisation et précision',
+            category: 'conventional',
+          },
+        ],
+      },
+      {
+        id: 4,
+        question: 'Quel type de problème préféreriez-vous résoudre ?',
+        options: [
+          {
+            value: 'a',
+            label: 'Réparer une machine en panne',
+            category: 'realistic',
+          },
+          {
+            value: 'b',
+            label: 'Découvrir pourquoi quelque chose fonctionne d\'une certaine manière',
+            category: 'investigative',
+          },
+          {
+            value: 'c',
+            label: 'Concevoir quelque chose de nouveau et original',
+            category: 'artistic',
+          },
+          {
+            value: 'd',
+            label: 'Aider quelqu\'un avec un problème personnel',
+            category: 'social',
+          },
+          {
+            value: 'e',
+            label: 'Trouver une opportunité d\'affaires',
+            category: 'enterprising',
+          },
+          {
+            value: 'f',
+            label: 'Optimiser un processus existant',
+            category: 'conventional',
+          },
+        ],
+      },
+      {
+        id: 5,
+        question: 'Quelle matière préfériez-vous à l\'école ?',
+        options: [
+          {
+            value: 'a',
+            label: 'Éducation physique ou technologie',
+            category: 'realistic',
+          },
+          {
+            value: 'b',
+            label: 'Sciences ou mathématiques',
+            category: 'investigative',
+          },
+          { value: 'c', label: 'Art ou musique', category: 'artistic' },
+          {
+            value: 'd',
+            label: 'Sciences sociales ou langues',
+            category: 'social',
+          },
+          { value: 'e', label: 'Économie ou débat', category: 'enterprising' },
+          {
+            value: 'f',
+            label: 'Informatique ou comptabilité',
+            category: 'conventional',
+          },
+        ],
+      },
+    ];
+  }
+
+  /**
+   * Obtenir les recommandations selon la catégorie
+   */
+  private getRecommendations(category: string): string[] {
+    const recommendations: { [key: string]: string[] } = {
+      realistic: [
+        'Ingénierie mécanique ou civile',
+        'Technicien de maintenance',
+        'Menuiserie ou électricité',
+        'Agriculture ou médecine vétérinaire',
+      ],
+      investigative: [
+        'Sciences naturelles ou médecine',
+        'Recherche scientifique',
+        'Analyse de données',
+        'Programmation et développement de logiciels',
+      ],
+      artistic: [
+        'Design graphique ou industriel',
+        'Beaux-arts ou musique',
+        'Architecture',
+        'Production audiovisuelle',
+      ],
+      social: [
+        'Psychologie ou travail social',
+        'Éducation ou pédagogie',
+        'Soins infirmiers ou médecine',
+        'Ressources humaines',
+      ],
+      enterprising: [
+        'Administration des affaires',
+        'Marketing et ventes',
+        'Droit',
+        'Entrepreneuriat',
+      ],
+      conventional: [
+        'Comptabilité et finances',
+        'Administration publique',
+        'Secrétariat exécutif',
+        'Logistique et opérations',
+      ],
+    };
     return recommendations[category] || recommendations['social'];
   }
 
   /**
-   * Obtiene la descripción de un perfil vocacional
+   * Gestion des erreurs HTTP
    */
-  getProfileDescription(category: string): VocationalProfile {
-    const profiles: Record<string, VocationalProfile> = {
-      social: {
-        name: "Perfil Social",
-        description: "Te motiva ayudar, enseñar y trabajar con personas",
-        characteristics: ["Empático", "Comunicativo", "Colaborativo", "Orientado al servicio"],
-        workEnvironments: ["Educación", "Salud", "Servicios sociales", "Recursos humanos"]
-      },
-      investigativo: {
-        name: "Perfil Investigativo",
-        description: "Te atrae resolver problemas, investigar y analizar",
-        characteristics: ["Analítico", "Curioso", "Metódico", "Orientado a datos"],
-        workEnvironments: ["Ciencia", "Tecnología", "Investigación", "Ingeniería"]
-      },
-      artístico: {
-        name: "Perfil Artístico",
-        description: "Te motiva crear, diseñar y expresarte creativamente",
-        characteristics: ["Creativo", "Original", "Expresivo", "Innovador"],
-        workEnvironments: ["Artes", "Diseño", "Medios", "Entretenimiento"]
-      },
-      emprendedor: {
-        name: "Perfil Emprendedor",
-        description: "Te atrae liderar, persuadir y dirigir proyectos",
-        characteristics: ["Líder", "Ambicioso", "Persuasivo", "Orientado a resultados"],
-        workEnvironments: ["Negocios", "Ventas", "Gerencia", "Emprendimiento"]
-      },
-      convencional: {
-        name: "Perfil Convencional",
-        description: "Te motiva organizar, administrar y trabajar con datos",
-        characteristics: ["Organizado", "Detallista", "Eficiente", "Confiable"],
-        workEnvironments: ["Administración", "Finanzas", "Contabilidad", "Operaciones"]
-      },
-      realista: {
-        name: "Perfil Realista",
-        description: "Te atrae trabajar con herramientas, máquinas y objetos",
-        characteristics: ["Práctico", "Técnico", "Independiente", "Orientado a resultados"],
-        workEnvironments: ["Ingeniería", "Construcción", "Agricultura", "Oficios especializados"]
-      }
-    };
-
-    return profiles[category] || profiles['social'];
-  }
-
-  /**
-   * Obtiene el emoji asociado a cada categoría vocacional
-   */
-  getCategoryEmoji(category: string): string {
-    const emojis: Record<string, string> = {
-      social: "👥",
-      investigativo: "🔬",
-      artístico: "🎨",
-      emprendedor: "💼",
-      convencional: "📊",
-      realista: "🔧"
-    };
-
-    return emojis[category] || "🎯";
-  }
-
-  /**
-   * Obtiene el color asociado a cada categoría vocacional
-   */
-  getCategoryColor(category: string): string {
-    const colors: Record<string, string> = {
-      social: "#4CAF50",      // Verde
-      investigativo: "#2196F3", // Azul
-      artístico: "#E91E63",    // Rosa
-      emprendedor: "#FF9800",  // Naranja
-      convencional: "#9C27B0", // Púrpura
-      realista: "#795548"      // Marrón
-    };
-
-    return colors[category] || "#607D8B";
-  }
-
-  /**
-   * Valida las respuestas del assessment
-   */
-  validateAssessmentAnswers(answers: any[]): boolean {
-    if (!answers || !Array.isArray(answers)) {
-      return false;
+  private getErrorMessage(error: HttpErrorResponse): string {
+    if (error.status === 429) {
+      return 'Vous avez effectué trop de consultations. Veuillez patienter un moment avant de continuer.';
     }
 
-    if (answers.length === 0) {
-      return false;
+    if (error.status === 503) {
+      return 'Le service est temporairement indisponible. Réessayez dans quelques minutes.';
     }
 
-    return answers.every(answer => 
-      answer.question && 
-      answer.answer && 
-      answer.category
-    );
-  }
-
-  /**
-   * Calcula el porcentaje de completitud del assessment
-   */
-  calculateAssessmentProgress(answeredQuestions: number, totalQuestions: number): number {
-    if (totalQuestions === 0) return 0;
-    return Math.round((answeredQuestions / totalQuestions) * 100);
-  }
-
-  /**
-   * Genera recomendaciones de desarrollo personal
-   */
-  getPersonalDevelopmentRecommendations(dominantProfile: string): string[] {
-    const recommendations: Record<string, string[]> = {
-      social: [
-        "Desarrolla habilidades de comunicación interpersonal",
-        "Practica la escucha activa y empática",
-        "Participa en actividades de voluntariado",
-        "Toma cursos de psicología o trabajo social"
-      ],
-      investigativo: [
-        "Fortalece habilidades analíticas y de investigación",
-        "Aprende nuevas metodologías científicas",
-        "Participa en proyectos de investigación",
-        "Desarrolla competencias en análisis de datos"
-      ],
-      artístico: [
-        "Explora diferentes formas de expresión creativa",
-        "Practica técnicas artísticas diversas",
-        "Participa en comunidades creativas",
-        "Desarrolla tu portfolio artístico"
-      ],
-      emprendedor: [
-        "Desarrolla habilidades de liderazgo",
-        "Aprende sobre gestión de negocios",
-        "Practica la toma de decisiones",
-        "Fortalece tu red de contactos profesionales"
-      ],
-      convencional: [
-        "Mejora habilidades organizacionales",
-        "Aprende herramientas de gestión",
-        "Desarrolla atención al detalle",
-        "Fortalece competencias administrativas"
-      ],
-      realista: [
-        "Desarrolla habilidades técnicas especializadas",
-        "Practica con herramientas y tecnologías",
-        "Participa en proyectos prácticos",
-        "Aprende oficios especializados"
-      ]
-    };
-
-    return recommendations[dominantProfile] || recommendations['social'];
-  }
-
-  /**
-   * Manejo de errores HTTP
-   */
-  private handleError = (error: any): Observable<never> => {
-    let errorMessage = 'Error desconocido';
-    
-    if (error.error instanceof ErrorEvent) {
-      // Error del lado del cliente
-      errorMessage = `Error: ${error.error.message}`;
-    } else {
-      // Error del servidor
-      errorMessage = error.error?.error || error.message || `Error HTTP: ${error.status}`;
+    if (error.status === 0) {
+      return 'Impossible de se connecter au conseiller d\'orientation. Réessayez dans quelques minutes.';
     }
-    
-    console.error('Error en MapaVocacionalService:', errorMessage);
-    return throwError(() => new Error(errorMessage));
-  };
+
+    return 'Désolé, je rencontre des difficultés techniques. Veuillez réessayer plus tard.';
+  }
 }

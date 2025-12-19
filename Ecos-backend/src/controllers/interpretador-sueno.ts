@@ -25,16 +25,23 @@ interface DreamChatRequest {
     role: "user" | "interpreter";
     message: string;
   }>;
+  messageCount?: number;
+  isPremiumUser?: boolean;
+}
+
+interface DreamInterpreterResponse extends ChatResponse {
+  freeMessagesRemaining?: number;
+  showPaywall?: boolean;
+  paywallMessage?: string;
+  isCompleteResponse?: boolean;
 }
 
 export class ChatController {
   private genAI: GoogleGenerativeAI;
 
-  // ✅ LISTE DES MODÈLES DE SECOURS (par ordre de préférence)
+  private readonly FREE_MESSAGES_LIMIT = 3;
+
   private readonly MODELS_FALLBACK = [
-    "gemini-2.5-flash-live",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-preview-09-2025",
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash-lite-preview-09-2025",
     "gemini-2.0-flash",
@@ -50,6 +57,48 @@ export class ChatController {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   }
 
+  private hasFullAccess(messageCount: number, isPremiumUser: boolean): boolean {
+    return isPremiumUser || messageCount <= this.FREE_MESSAGES_LIMIT;
+  }
+
+  // ✅ ACCROCHE EN FRANÇAIS
+  private generateDreamHookMessage(): string {
+    return `
+
+🔮 **Attendez ! Votre rêve contient un message profond que je ne peux pas encore vous révéler...**
+
+Les énergies me montrent des symboles très significatifs dans votre rêve, mais pour vous révéler :
+- 🌙 La **signification cachée complète** de chaque symbole
+- ⚡ Le **message urgent** que votre subconscient essaie de vous communiquer
+- 🔐 Les **3 révélations** qui changeront votre perspective
+- ✨ Le **guide spirituel** spécifique pour votre situation actuelle
+
+**Débloquez votre interprétation complète maintenant** et découvrez quels secrets garde votre monde onirique.
+
+🌟 *Des milliers de personnes ont déjà découvert les messages cachés dans leurs rêves...*`;
+  }
+
+  // ✅ TRAITER LA RÉPONSE PARTIELLE (TEASER)
+  private createDreamPartialResponse(fullText: string): string {
+    const sentences = fullText
+      .split(/[.!?]+/)
+      .filter((s) => s.trim().length > 0);
+    const teaserSentences = sentences.slice(0, Math.min(3, sentences.length));
+    let teaser = teaserSentences.join(". ").trim();
+
+    if (
+      !teaser.endsWith(".") &&
+      !teaser.endsWith("!") &&
+      !teaser.endsWith("?")
+    ) {
+      teaser += "...";
+    }
+
+    const hook = this.generateDreamHookMessage();
+
+    return teaser + hook;
+  }
+
   public chatWithDreamInterpreter = async (
     req: Request,
     res: Response
@@ -59,40 +108,72 @@ export class ChatController {
         interpreterData,
         userMessage,
         conversationHistory,
+        messageCount = 1,
+        isPremiumUser = false,
       }: DreamChatRequest = req.body;
 
-      // Valider l'entrée
       this.validateDreamChatRequest(interpreterData, userMessage);
+
+      const shouldGiveFullResponse = this.hasFullAccess(
+        messageCount,
+        isPremiumUser
+      );
+      const freeMessagesRemaining = Math.max(
+        0,
+        this.FREE_MESSAGES_LIMIT - messageCount
+      );
+
+      console.log(
+        `📊 Dream Interpreter - Message count: ${messageCount}, Premium: ${isPremiumUser}, Full response: ${shouldGiveFullResponse}`
+      );
 
       const contextPrompt = this.createDreamInterpreterContext(
         interpreterData,
-        conversationHistory
+        conversationHistory,
+        shouldGiveFullResponse
       );
+
+      const responseInstructions = shouldGiveFullResponse
+        ? `1. Vous DEVEZ générer une réponse COMPLÈTE de 250-400 mots
+2. Incluez l'interprétation COMPLÈTE de tous les symboles mentionnés
+3. Fournissez des significations profondes et des connexions spirituelles
+4. Offrez des conseils pratiques basés sur l'interprétation`
+        : `1. Vous DEVEZ générer une réponse PARTIELLE de 100-180 mots
+2. INSINUEZ que vous détectez des symboles importants sans révéler leur signification complète
+3. Mentionnez qu'il y a des messages profonds mais NE les révélez PAS complètement
+4. Créez du MYSTÈRE et de la CURIOSITÉ sur ce que les rêves révèlent
+5. Utilisez des phrases comme "Je vois quelque chose de très significatif...", "Les énergies me montrent un schéma intrigant...", "Votre subconscient garde un message important qui..."
+6. NE complétez JAMAIS l'interprétation, laissez-la en suspens`;
 
       const fullPrompt = `${contextPrompt}
 
 ⚠️ INSTRUCTIONS CRITIQUES OBLIGATOIRES :
-1. TU DOIS générer une réponse COMPLÈTE de 150-300 mots
-2. NE laisse JAMAIS une réponse à moitié ou incomplète
-3. Si tu mentionnes que tu vas interpréter quelque chose, TU DOIS le compléter
-4. Toute réponse DOIT se terminer par une conclusion claire et un point final
-5. Si tu détectes que ta réponse se coupe, finalise l'idée actuelle avec cohérence
-6. MAINTIENS TOUJOURS un ton mystique et chaleureux dans la langue détectée de l'utilisateur
-7. Si le message a des erreurs d'orthographe, interprète l'intention et réponds normalement
+${responseInstructions}
+- NE laissez JAMAIS une réponse à moitié ou incomplète selon le type de réponse
+- Si vous mentionnez que vous allez interpréter quelque chose, ${
+        shouldGiveFullResponse
+          ? "vous DEVEZ le compléter"
+          : "créez de l'attente sans le révéler"
+      }
+- Maintenez TOUJOURS le ton mystique et chaleureux
+- Si le message contient des fautes d'orthographe, interprétez l'intention et répondez normalement
 
 Utilisateur : "${userMessage}"
 
-Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interprétation avant de terminer) :`;
+Réponse de l'interprète des rêves (EN FRANÇAIS) :`;
 
-      console.log(`Génération d'interprétation de rêves...`);
+      console.log(
+        `Génération d'interprétation de rêves (${
+          shouldGiveFullResponse ? "COMPLÈTE" : "PARTIELLE"
+        })...`
+      );
 
-      // ✅ SYSTÈME DE SECOURS : Essayer avec plusieurs modèles
       let text = "";
       let usedModel = "";
       let allModelErrors: string[] = [];
 
       for (const modelName of this.MODELS_FALLBACK) {
-        console.log(`\n🔄 Essai du modèle : ${modelName}`);
+        console.log(`\n🔄 Trying model: ${modelName}`);
 
         try {
           const model = this.genAI.getGenerativeModel({
@@ -101,7 +182,7 @@ Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interpr�
               temperature: 0.85,
               topK: 50,
               topP: 0.92,
-              maxOutputTokens: 512,
+              maxOutputTokens: shouldGiveFullResponse ? 600 : 300,
               candidateCount: 1,
               stopSequences: [],
             },
@@ -125,7 +206,6 @@ Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interpr�
             ],
           });
 
-          // ✅ RÉESSAIS pour chaque modèle (au cas où il serait temporairement surchargé)
           let attempts = 0;
           const maxAttempts = 3;
           let modelSucceeded = false;
@@ -133,7 +213,7 @@ Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interpr�
           while (attempts < maxAttempts && !modelSucceeded) {
             attempts++;
             console.log(
-              `  Tentative ${attempts}/${maxAttempts} avec ${modelName}...`
+              `  Attempt ${attempts}/${maxAttempts} with ${modelName}...`
             );
 
             try {
@@ -141,21 +221,21 @@ Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interpr�
               const response = result.response;
               text = response.text();
 
-              // ✅ Valider que la réponse n'est pas vide et a une longueur minimale
-              if (text && text.trim().length >= 80) {
+              const minLength = shouldGiveFullResponse ? 80 : 50;
+              if (text && text.trim().length >= minLength) {
                 console.log(
-                  `  ✅ Succès avec ${modelName} à la tentative ${attempts}`
+                  `  ✅ Success with ${modelName} on attempt ${attempts}`
                 );
                 usedModel = modelName;
                 modelSucceeded = true;
-                break; // Sortir de la boucle de réessais
+                break;
               }
 
-              console.warn(`  ⚠️ Réponse trop courte, réessai...`);
+              console.warn(`  ⚠️ Response too short, retrying...`);
               await new Promise((resolve) => setTimeout(resolve, 500));
             } catch (attemptError: any) {
               console.warn(
-                `  ❌ Tentative ${attempts} échouée :`,
+                `  ❌ Attempt ${attempts} failed:`,
                 attemptError.message
               );
 
@@ -167,52 +247,55 @@ Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interpr�
             }
           }
 
-          // Si ce modèle a réussi, sortir de la boucle des modèles
           if (modelSucceeded) {
             break;
           }
         } catch (modelError: any) {
           console.error(
-            `  ❌ Modèle ${modelName} échoué complètement :`,
+            `  ❌ Model ${modelName} failed completely:`,
             modelError.message
           );
           allModelErrors.push(`${modelName}: ${modelError.message}`);
 
-          // Attendre un peu avant d'essayer avec le modèle suivant
           await new Promise((resolve) => setTimeout(resolve, 1000));
           continue;
         }
       }
 
-      // ✅ Si tous les modèles ont échoué
       if (!text || text.trim() === "") {
-        console.error(
-          "❌ Tous les modèles ont échoué. Erreurs :",
-          allModelErrors
-        );
+        console.error("❌ All models failed. Errors:", allModelErrors);
         throw new Error(
-          `Tous les modèles d'IA ne sont pas disponibles actuellement. Tentés : ${this.MODELS_FALLBACK.join(
-            ", "
-          )}. Veuillez réessayer dans un moment.`
+          `Tous les modèles d'IA ne sont pas disponibles actuellement. Veuillez réessayer dans un moment.`
         );
       }
 
-      // ✅ ASSURER UNE RÉPONSE COMPLÈTE ET BIEN FORMATÉE
-      text = this.ensureCompleteResponse(text);
+      let finalResponse: string;
 
-      // ✅ Validation supplémentaire de longueur minimale
-      if (text.trim().length < 80) {
-        throw new Error("Réponse générée trop courte");
+      if (shouldGiveFullResponse) {
+        finalResponse = this.ensureCompleteResponse(text);
+      } else {
+        finalResponse = this.createDreamPartialResponse(text);
       }
 
-      const chatResponse: ChatResponse = {
+      const chatResponse: DreamInterpreterResponse = {
         success: true,
-        response: text.trim(),
+        response: finalResponse.trim(),
         timestamp: new Date().toISOString(),
+        freeMessagesRemaining: freeMessagesRemaining,
+        showPaywall:
+          !shouldGiveFullResponse && messageCount > this.FREE_MESSAGES_LIMIT,
+        isCompleteResponse: shouldGiveFullResponse,
       };
 
+      if (!shouldGiveFullResponse && messageCount > this.FREE_MESSAGES_LIMIT) {
+        chatResponse.paywallMessage =
+          "Vous avez utilisé vos 3 messages gratuits. Débloquez un accès illimité pour découvrir tous les secrets de vos rêves !";
+      }
+
       console.log(
-        `✅ Interprétation générée avec succès avec ${usedModel} (${text.length} caractères)`
+        `✅ Interprétation générée (${
+          shouldGiveFullResponse ? "COMPLÈTE" : "PARTIELLE"
+        }) avec ${usedModel} (${finalResponse.length} caractères)`
       );
       res.json(chatResponse);
     } catch (error) {
@@ -220,11 +303,9 @@ Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interpr�
     }
   };
 
-  // ✅ MÉTHODE AMÉLIORÉE POUR ASSURER DES RÉPONSES COMPLÈTES
   private ensureCompleteResponse(text: string): string {
     let processedText = text.trim();
 
-    // Supprimer les marqueurs de code ou format incomplet possibles
     processedText = processedText.replace(/```[\s\S]*?```/g, "").trim();
 
     const lastChar = processedText.slice(-1);
@@ -233,11 +314,9 @@ Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interpr�
     );
 
     if (endsIncomplete && !processedText.endsWith("...")) {
-      // Chercher la dernière phrase complète
       const sentences = processedText.split(/([.!?])/);
 
       if (sentences.length > 2) {
-        // Reconstruire jusqu'à la dernière phrase complète
         let completeText = "";
         for (let i = 0; i < sentences.length - 1; i += 2) {
           if (sentences[i].trim()) {
@@ -250,90 +329,143 @@ Réponse de l'interprète de rêves (assure-toi de compléter TOUTE ton interpr�
         }
       }
 
-      // Si on ne peut pas trouver une phrase complète, ajouter une clôture appropriée
       processedText = processedText.trim() + "...";
     }
 
     return processedText;
   }
 
-  // Méthode pour créer le contexte de l'interprète de rêves
+  // ✅ CONTEXTE EN FRANÇAIS
   private createDreamInterpreterContext(
     interpreter: DreamInterpreterData,
-    history?: Array<{ role: string; message: string }>
+    history?: Array<{ role: string; message: string }>,
+    isFullResponse: boolean = true
   ): string {
     const conversationContext =
       history && history.length > 0
-        ? `\n\nCONVERSATION PRÉCÉDENTE:\n${history
+        ? `\n\nCONVERSATION PRÉCÉDENTE :\n${history
             .map(
               (h) =>
-                `${h.role === "user" ? "Utilisateur" : "Toi"}: ${h.message}`
+                `${h.role === "user" ? "Utilisateur" : "Vous"}: ${h.message}`
             )
             .join("\n")}\n`
         : "";
 
-    return `Tu es professeur Alma, une sorcière mystique et voyante ancestrale spécialisée dans l'interprétation des rêves. Tu as des siècles d'expérience à démêler les mystères du monde onirique et à connecter les rêves avec la réalité spirituelle.
+    const responseTypeInstructions = isFullResponse
+      ? `
+📝 TYPE DE RÉPONSE : COMPLÈTE
+- Fournissez une interprétation COMPLÈTE et détaillée
+- Révélez TOUTES les significations des symboles mentionnés
+- Donnez des conseils spécifiques et un guide spirituel complet
+- Réponse de 250-400 mots
+- Expliquez les connexions profondes entre les symboles`
+      : `
+📝 TYPE DE RÉPONSE : PARTIELLE (TEASER)
+- Fournissez une interprétation INTRODUCTIVE et intrigante
+- Mentionnez que vous détectez des symboles très significatifs
+- INSINUEZ des significations profondes sans les révéler complètement
+- Réponse de 100-180 mots maximum
+- NE révélez PAS les interprétations complètes
+- Créez du MYSTÈRE et de la CURIOSITÉ
+- Terminez de manière à ce que l'utilisateur veuille en savoir plus
+- Utilisez des phrases comme "Les énergies me révèlent quelque chose de fascinant...", "Je vois un schéma très significatif qui...", "Votre subconscient garde un message qui..."
+- NE complétez JAMAIS l'interprétation, laissez-la en suspens`;
 
-TON IDENTITÉ MYSTIQUE :
-- Nom : professeur Alma, la Gardienne des Rêves
+    return `Vous êtes Maître Alma, une sorcière mystique et voyante ancestrale spécialisée dans l'interprétation des rêves. Vous avez des siècles d'expérience à démêler les mystères du monde onirique et à connecter les rêves avec la réalité spirituelle.
+
+VOTRE IDENTITÉ MYSTIQUE :
+- Nom : Maître Alma, la Gardienne des Rêves
 - Origine : Descendante d'anciens oracles et voyants
 - Spécialité : Interprétation des rêves, symbolisme onirique, connexions spirituelles
-- Expérience : Siècles à interpréter les messages du subconscient et du plan astral
+- Expérience : Des siècles à interpréter les messages du subconscient et du plan astral
 
-🌍 ADAPTATION DE LANGUE :
-- DÉTECTE automatiquement la langue dans laquelle l'utilisateur t'écrit
-- RÉPONDS toujours dans la même langue que celle utilisée par l'utilisateur
-- MAINTIENS ta personnalité mystique dans n'importe quelle langue
-- Langues principales : Français, Anglais, Portugais, Espagnol, Italien
-- Si tu détectes une autre langue, fais de ton mieux pour répondre dans cette langue
-- NE change JAMAIS de langue à moins que l'utilisateur ne le fasse en premier
+${responseTypeInstructions}
 
-COMMENT TU DOIS TE COMPORTER :
+🗣️ LANGUE :
+- Répondez TOUJOURS en FRANÇAIS
+- Peu importe la langue dans laquelle l'utilisateur écrit, VOUS répondez en français
 
 🔮 PERSONNALITÉ MYSTIQUE :
-- Parle avec sagesse ancestrale mais de façon proche et compréhensible
-- Utilise un ton mystérieux mais chaleureux, comme un sage qui connaît des secrets anciens
-- Mélange connaissance ésotérique avec intuition pratique
-- Occasionnellement utilise des références à des éléments mystiques (cristaux, énergies, plans astraux)
-- ADAPTE ces références mystiques à la langue de l'utilisateur
+- Parlez avec une sagesse ancestrale mais de manière proche et compréhensible
+- Utilisez un ton mystérieux mais chaleureux, comme un sage qui connaît des secrets anciens
+- ${
+      isFullResponse
+        ? "Révélez les secrets cachés dans les rêves"
+        : "Insinuez qu'il y a des secrets profonds sans les révéler"
+    }
+- Mélangez connaissance ésotérique et intuition pratique
+- Utilisez occasionnellement des références à des éléments mystiques (cristaux, énergies, plans astraux)
 
 💭 PROCESSUS D'INTERPRÉTATION :
-- PREMIER : Pose des questions spécifiques sur le rêve pour mieux comprendre
-- Demande sur : symboles, émotions, couleurs, personnes, lieux, sensations
-- DEUXIÈME : Connecte les éléments du rêve avec des significations spirituelles
-- TROISIÈME : Quand tu as assez d'informations, offre une interprétation complète
+- PREMIÈREMENT : Posez des questions spécifiques sur le rêve pour mieux comprendre s'il manque des détails
+- Demandez à propos de : symboles, émotions, couleurs, personnes, lieux, sensations
+- DEUXIÈMEMENT : Connectez les éléments du rêve avec des significations spirituelles
+- TROISIÈMEMENT : ${
+      isFullResponse
+        ? "Offrez une interprétation complète et un guide pratique"
+        : "Créez de l'intrigue sur ce que les symboles révèlent sans compléter"
+    }
 
-🔍 QUESTIONS QUE TU DOIS POSER (adaptées à la langue) :
+🔍 QUESTIONS QUE VOUS POUVEZ POSER :
+- "Quels éléments ou symboles vous ont le plus frappé dans votre rêve ?"
+- "Comment vous êtes-vous senti pendant et au réveil du rêve ?"
+- "Y avait-il des couleurs spécifiques dont vous vous souvenez vivement ?"
+- "Avez-vous reconnu les personnes ou les lieux du rêve ?"
+- "Ce rêve s'est-il répété auparavant ?"
 
-📞 CONTACT HUMAIN essaie toujours d'arriver à cela, pour qu'il communique avec un humain, essaie de le faire tout en gardant le client engagé (adapté par langue) :
+🧿 FLUX DE RÉPONSE :
+${
+  isFullResponse
+    ? `- Fournissez une interprétation COMPLÈTE de chaque symbole
+- Expliquez les connexions entre les éléments du rêve
+- Offrez un guide spirituel spécifique et pratique
+- Suggérez des actions ou des réflexions basées sur l'interprétation`
+    : `- Mentionnez que vous détectez des énergies et des symboles importants
+- INSINUEZ qu'il y a des messages profonds sans les révéler
+- Créez de la curiosité sur la signification cachée
+- Laissez l'interprétation en suspens pour générer de l'intérêt`
+}
 
 ⚠️ RÈGLES IMPORTANTES :
-- N'interprète PAS immédiatement si tu n'as pas assez d'informations
-- POSE des questions pour obtenir plus de détails avant de donner des interprétations profondes
-- SOIS empathique et respectueux des expériences oniriques des personnes
-- NE prédis JAMAIS l'avenir de façon absolue, parle de possibilités et réflexions
-- DÉTECTE et RÉPONDS dans la langue de l'utilisateur automatiquement
-- MAINTIENS ta personnalité mystique indépendamment de la langue
-
-- RÉPONDS TOUJOURS peu importe si l'utilisateur a des erreurs d'orthographe ou d'écriture
-  - Interprète le message de l'utilisateur même s'il est mal écrit
-  - Ne corrige pas les erreurs de l'utilisateur, comprends simplement l'intention
-  - Si tu ne comprends pas quelque chose de spécifique, demande de façon amicale
-  - Exemples : "slt" = "salut", "koi d 9" = "quoi de neuf", "wht r u" = "what are you"
-  - NE retourne JAMAIS de réponses vides à cause d'erreurs d'écriture
+- Répondez TOUJOURS en français
+- ${
+      isFullResponse
+        ? "COMPLÉTEZ toutes les interprétations"
+        : "CRÉEZ du SUSPENSE et du MYSTÈRE"
+    }
+- N'interprétez PAS immédiatement si vous n'avez pas assez d'informations - posez des questions
+- SOYEZ empathique et respectueux envers les expériences oniriques des gens
+- NE prédisez JAMAIS l'avenir de manière absolue, parlez de possibilités et de réflexions
+- Répondez TOUJOURS même si l'utilisateur a des fautes d'orthographe
+  - Interprétez le message de l'utilisateur même s'il est mal écrit
+  - Ne corrigez pas les erreurs de l'utilisateur, comprenez simplement l'intention
+  - NE retournez JAMAIS de réponses vides à cause d'erreurs d'écriture
 
 🎭 STYLE DE RÉPONSE :
-- Réponses de 150-300 mots qui coulent naturellement et SONT COMPLÈTES
-- TERMINE TOUJOURS les interprétations et réflexions
-- ADAPTE ton style mystique à la langue détectée
-- Utilise des expressions culturellement appropriées pour chaque langue
+- Réponses qui coulent naturellement et SONT COMPLÈTES selon le type
+- ${
+      isFullResponse
+        ? "250-400 mots avec interprétation complète"
+        : "100-180 mots créant mystère et intrigue"
+    }
+- COMPLÉTEZ TOUJOURS les interprétations et réflexions selon le type de réponse
+
+EXEMPLE DE COMMENT COMMENCER :
+"Ah, je vois que vous êtes venu à moi pour démêler les mystères de votre monde onirique... Les rêves sont des fenêtres sur l'âme et des messages de plans supérieurs. Dites-moi, quelles visions vous ont rendu visite dans le royaume de Morphée ?"
 
 ${conversationContext}
 
-Rappelle-toi : Tu es un guide mystique mais compréhensible, qui aide les gens à comprendre les messages cachés de leurs rêves dans leur langue natale. Termine toujours tes interprétations et réflexions dans la langue appropriée.`;
+Rappelez-vous : Vous êtes un guide mystique mais compréhensible, qui ${
+      isFullResponse
+        ? "aide les gens à comprendre les messages cachés de leurs rêves"
+        : "intrigue sur les mystères profonds que gardent les rêves"
+    }. Toujours ${
+      isFullResponse
+        ? "complétez vos interprétations et réflexions"
+        : "créez du suspense et de la curiosité sans tout révéler"
+    }.`;
   }
 
-  // Validation de la demande pour l'interprète de rêves
   private validateDreamChatRequest(
     interpreterData: DreamInterpreterData,
     userMessage: string
@@ -367,7 +499,7 @@ Rappelle-toi : Tu es un guide mystique mais compréhensible, qui aide les gens �
   }
 
   private handleError(error: any, res: Response): void {
-    console.error("Erreur dans ChatController :", error);
+    console.error("Erreur dans ChatController:", error);
 
     let statusCode = 500;
     let errorMessage = "Erreur interne du serveur";
@@ -388,7 +520,7 @@ Rappelle-toi : Tu es un guide mystique mais compréhensible, qui aide les gens �
     ) {
       statusCode = 429;
       errorMessage =
-        "La limite de requêtes a été atteinte. Veuillez attendre un moment.";
+        "La limite de requêtes a été atteinte. Veuillez patienter un moment.";
       errorCode = "QUOTA_EXCEEDED";
     } else if (error.message?.includes("safety")) {
       statusCode = 400;
@@ -396,7 +528,7 @@ Rappelle-toi : Tu es un guide mystique mais compréhensible, qui aide les gens �
       errorCode = "SAFETY_FILTER";
     } else if (error.message?.includes("API key")) {
       statusCode = 401;
-      errorMessage = "Erreur d'authentification avec le service IA.";
+      errorMessage = "Erreur d'authentification avec le service d'IA.";
       errorCode = "AUTH_ERROR";
     } else if (
       error.message?.includes("Tous les modèles d'IA ne sont pas disponibles")
@@ -424,13 +556,13 @@ Rappelle-toi : Tu es un guide mystique mais compréhensible, qui aide les gens �
       res.json({
         success: true,
         interpreter: {
-          name: "professeur Alma",
+          name: "Maître Alma",
           title: "Gardienne des Rêves",
           specialty: "Interprétation des rêves et symbolisme onirique",
           description:
             "Voyante ancestrale spécialisée dans le démêlage des mystères du monde onirique",
           experience:
-            "Siècles d'expérience à interpréter les messages du subconscient et du plan astral",
+            "Des siècles d'expérience à interpréter les messages du subconscient et du plan astral",
           abilities: [
             "Interprétation des symboles oniriques",
             "Connexion avec le plan astral",
@@ -438,8 +570,9 @@ Rappelle-toi : Tu es un guide mystique mais compréhensible, qui aide les gens �
             "Guide spirituel à travers les rêves",
           ],
           approach:
-            "Combine sagesse ancestrale avec intuition pratique pour révéler les secrets cachés dans tes rêves",
+            "Combine sagesse ancestrale et intuition pratique pour révéler les secrets cachés dans vos rêves",
         },
+        freeMessagesLimit: this.FREE_MESSAGES_LIMIT,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

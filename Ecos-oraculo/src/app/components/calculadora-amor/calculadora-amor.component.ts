@@ -56,7 +56,6 @@ import {
     MatProgressSpinnerModule,
     MatNativeDateModule,
     RecolectaDatosComponent,
-    FortuneWheelComponent,
   ],
   templateUrl: './calculadora-amor.component.html',
   styleUrl: './calculadora-amor.component.css',
@@ -67,10 +66,10 @@ export class CalculadoraAmorComponent
 {
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
-  textareaHeight: number = 45; // Altura inicial
+  textareaHeight: number = 45;
   private readonly minTextareaHeight = 45;
   private readonly maxTextareaHeight = 120;
-  // Variables principales del chat
+
   conversationHistory: ConversationMessage[] = [];
   currentMessage: string = '';
   messageInput = new FormControl('');
@@ -85,7 +84,6 @@ export class CalculadoraAmorComponent
   private shouldAutoScroll = true;
   private lastMessageCount = 0;
 
-  // Variables para control de pagos
   showPaymentModal: boolean = false;
 
   clientSecret: string | null = null;
@@ -94,9 +92,8 @@ export class CalculadoraAmorComponent
   hasUserPaidForLove: boolean = false;
   firstQuestionAsked: boolean = false;
 
-  // NUEVA PROPIEDAD para controlar mensajes bloqueados
   blockedMessageId: string | null = null;
-  //propiedades para la ruleta
+
   showFortuneWheel: boolean = false;
   lovePrizes: Prize[] = [
     {
@@ -113,7 +110,7 @@ export class CalculadoraAmorComponent
     },
     {
       id: '4',
-      name: 'Réessaie!',
+      name: 'Réessayez !',
       color: '#dc143c',
       icon: '💘',
     },
@@ -122,14 +119,11 @@ export class CalculadoraAmorComponent
   private wheelTimer: any;
   private backendUrl = environment.apiUrl;
 
-  // Formulario reactivo
   compatibilityForm: FormGroup;
 
-  // Estado del componente
   loveExpertInfo: LoveExpertInfo | null = null;
   compatibilityData: CompatibilityData | null = null;
 
-  // Subject para manejar unsubscriptions
   private destroy$ = new Subject<void>();
 
   // Info del experto en amor
@@ -141,10 +135,10 @@ export class CalculadoraAmorComponent
 
   // Frases de bienvenida aleatorias
   welcomeMessages = [
-    "Bienvenue, âme amoureuse! 💕 Je suis la Maîtresse Paula, et je suis ici pour te révéler les secrets du vrai amour. Les cartes de l'amour chuchotent des histoires de cœurs unis et de passions éternelles. Es-tu prêt(e) à découvrir la compatibilité de ta relation?",
-    "Les énergies de l'amour me susurrent que tu es venu(e) chercher des réponses du cœur... Les nombres de l'amour révèlent la chimie entre les âmes. Quel secret romantique aimerais-tu connaître?",
+    "Bienvenue, âme amoureuse ! 💕 Je suis Maîtresse Paula, et je suis ici pour te révéler les secrets du véritable amour. Les cartes de l'amour murmurent des histoires de cœurs unis et de passions éternelles. Es-tu prêt(e) à découvrir la compatibilité de ta relation ?",
+    "Les énergies de l'amour me murmurent que tu es venu(e) chercher des réponses du cœur... Les nombres de l'amour révèlent la chimie entre les âmes. Quel secret romantique aimerais-tu connaître ?",
     "Bienvenue dans le temple de l'amour éternel. Les motifs numérologiques de la romance ont annoncé ton arrivée. Laisse-moi calculer la compatibilité de ta relation à travers la numérologie sacrée.",
-    "Les nombres de l'amour dansent devant moi et révèlent ta présence... Chaque calcul révèle un destin romantique. Quel couple aimerais-tu que j'analyse numériquement pour toi?",
+    "Les nombres de l'amour dansent devant moi et révèlent ta présence... Chaque calcul dévoile un destin romantique. Quel couple aimerais-tu que j'analyse numériquement pour toi ?",
   ];
 
   constructor(
@@ -152,13 +146,12 @@ export class CalculadoraAmorComponent
     private formBuilder: FormBuilder,
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
-    private paypalService: PaypalService // ← AGREGAR ESTA LÍNEA
+    private paypalService: PaypalService
   ) {
     this.compatibilityForm = this.createCompatibilityForm();
   }
 
   async ngOnInit(): Promise<void> {
-    // ✅ Verificar pago SOLO de este servicio específico
     this.hasUserPaidForLove =
       sessionStorage.getItem('hasUserPaidForLove_liebesrechner') === 'true';
 
@@ -171,38 +164,33 @@ export class CalculadoraAmorComponent
         );
 
         if (verification.valid && verification.status === 'approved') {
-          // ✅ Pago SOLO para este servicio (Liebesrechner)
           this.hasUserPaidForLove = true;
           sessionStorage.setItem('hasUserPaidForLove_liebesrechner', 'true');
 
-          // NO usar localStorage global
           localStorage.removeItem('paypal_payment_completed');
 
           this.blockedMessageId = null;
           sessionStorage.removeItem('loveBlockedMessageId');
 
-          // Limpiar URL
           window.history.replaceState(
             {},
             document.title,
             window.location.pathname
           );
 
-          // Cerrar modal de pago
           this.showPaymentModal = false;
           this.isProcessingPayment = false;
           this.paymentError = null;
           this.cdr.markForCheck();
 
-          // ✅ MENSAJE DE CONFIRMACIÓN (usando conversationHistory.push con interfaz correcta)
           setTimeout(() => {
             const successMessage: ConversationMessage = {
               role: 'love_expert',
               message:
-                '🎉 Paiement effectué avec succès!\n\n' +
+                '🎉 Paiement effectué avec succès !\n\n' +
                 "✨ Merci pour ton paiement. Tu as maintenant un accès complet aux calculateurs d'amour.\n\n" +
-                "💕 Découvrons ensemble les secrets de l'amour!\n\n" +
-                "📌 Remarque: Ce paiement est valable uniquement pour le service de calculateur d'amour. Un paiement séparé est requis pour les autres services.",
+                "💕 Découvrons ensemble les secrets de l'amour !\n\n" +
+                "📌 Remarque : Ce paiement est valable uniquement pour le service de calculateur d'amour. Un paiement séparé est requis pour les autres services.",
               timestamp: new Date(),
             };
             this.conversationHistory.push(successMessage);
@@ -211,7 +199,7 @@ export class CalculadoraAmorComponent
             setTimeout(() => this.scrollToBottom(), 200);
           }, 1000);
         } else {
-          this.paymentError = 'Le paiement n\'a pas pu être vérifié.';
+          this.paymentError = "Le paiement n'a pas pu être vérifié.";
 
           setTimeout(() => {
             const errorMessage: ConversationMessage = {
@@ -243,7 +231,6 @@ export class CalculadoraAmorComponent
       }
     }
 
-    // ✅ NUEVO: Cargar datos del usuario desde sessionStorage
     const savedUserData = sessionStorage.getItem('userData');
     if (savedUserData) {
       try {
@@ -255,13 +242,11 @@ export class CalculadoraAmorComponent
       this.userData = null;
     }
 
-    // ✅ REFACTORIZAR: Separar carga de datos
     this.loadLoveData();
 
     this.loadLoveExpertInfo();
     this.subscribeToCompatibilityData();
 
-    // ✅ TAMBIÉN VERIFICAR PARA MENSAJES RESTAURADOS
     if (
       this.conversationHistory.length > 0 &&
       FortuneWheelComponent.canShowWheel()
@@ -269,6 +254,7 @@ export class CalculadoraAmorComponent
       this.showLoveWheelAfterDelay(2000);
     }
   }
+
   private loadLoveData(): void {
     const savedMessages = sessionStorage.getItem('loveMessages');
     const savedFirstQuestion = sessionStorage.getItem('loveFirstQuestionAsked');
@@ -294,6 +280,7 @@ export class CalculadoraAmorComponent
       this.initializeLoveWelcomeMessage();
     }
   }
+
   private initializeLoveWelcomeMessage(): void {
     const randomWelcome =
       this.welcomeMessages[
@@ -309,27 +296,23 @@ export class CalculadoraAmorComponent
     this.conversationHistory.push(welcomeMessage);
     this.hasStartedConversation = true;
 
-    // ✅ VERIFICACIÓN DE RULETA AMOROSA
     if (FortuneWheelComponent.canShowWheel()) {
       this.showLoveWheelAfterDelay(3000);
-    } else {
     }
   }
 
   openDataModalForPayment(): void {
-    // Cerrar otros modales que puedan estar abiertos
     this.showFortuneWheel = false;
     this.showPaymentModal = false;
 
-    // Guardar el estado antes de proceder
     this.saveStateBeforePayment();
 
-    // Abrir el modal de recolecta de datos
     setTimeout(() => {
       this.showDataModal = true;
       this.cdr.markForCheck();
     }, 100);
   }
+
   ngAfterViewChecked(): void {
     if (
       this.shouldAutoScroll &&
@@ -370,9 +353,6 @@ export class CalculadoraAmorComponent
     this.hasStartedConversation = true;
   }
 
-  /**
-   * Crea el formulario reactivo para los datos de compatibilidad
-   */
   private createCompatibilityForm(): FormGroup {
     return this.formBuilder.group({
       person1Name: ['', [Validators.required, Validators.minLength(2)]],
@@ -382,9 +362,6 @@ export class CalculadoraAmorComponent
     });
   }
 
-  /**
-   * Carga la información del experto en amor
-   */
   private loadLoveExpertInfo(): void {
     this.calculadoraAmorService
       .getLoveExpertInfo()
@@ -400,9 +377,6 @@ export class CalculadoraAmorComponent
       });
   }
 
-  /**
-   * Se suscribe a los datos de compatibilidad
-   */
   private subscribeToCompatibilityData(): void {
     this.calculadoraAmorService.compatibilityData$
       .pipe(takeUntil(this.destroy$))
@@ -414,9 +388,6 @@ export class CalculadoraAmorComponent
       });
   }
 
-  /**
-   * Puebla el formulario con los datos de compatibilidad
-   */
   private populateFormWithData(data: CompatibilityData): void {
     this.compatibilityForm.patchValue({
       person1Name: data.person1Name,
@@ -426,9 +397,6 @@ export class CalculadoraAmorComponent
     });
   }
 
-  /**
-   * Calcula la compatibilidad entre las dos personas
-   */
   calculateCompatibility(): void {
     if (this.compatibilityForm.invalid) {
       this.markFormGroupTouched();
@@ -463,25 +431,20 @@ export class CalculadoraAmorComponent
       });
   }
 
-  /**
-   * Maneja la respuesta del cálculo de compatibilidad
-   */
   private handleCalculationResponse(response: LoveCalculatorResponse): void {
     if (response.success) {
       this.hasStartedConversation = true;
       this.showDataForm = false;
 
-      // Agregar mensaje de confirmación del cálculo
       const calculationMsg: ConversationMessage = {
         role: 'love_expert',
-        message: `✨ J\'ai terminé l\'analyse numérologique de ${this.compatibilityForm.value.person1Name} et ${this.compatibilityForm.value.person2Name}. Les nombres de l\'amour ont révélé des informations fascinantes sur votre compatibilité. Voulez-vous connaître les détails de cette lecture d\'amour?`,
+        message: `✨ J'ai terminé l'analyse numérologique de ${this.compatibilityForm.value.person1Name} et ${this.compatibilityForm.value.person2Name}. Les nombres de l'amour ont révélé des informations fascinantes sur votre compatibilité. Voulez-vous connaître les détails de cette lecture d'amour ?`,
         timestamp: new Date(),
       };
 
       this.conversationHistory.push(calculationMsg);
       this.saveMessagesToSession();
       this.shouldAutoScroll = true;
-    } else {
     }
   }
 
@@ -490,39 +453,32 @@ export class CalculadoraAmorComponent
 
     const userMessage = this.currentMessage.trim();
 
-    // ✅ NUEVA LÓGICA: Verificar consultas amorosas gratuitas ANTES de verificar pago
     if (!this.hasUserPaidForLove && this.firstQuestionAsked) {
-      // Verificar si tiene consultas amorosas gratis disponibles
       if (this.hasFreeLoveConsultationsAvailable()) {
         this.useFreeLoveConsultation();
-        // Continuar con el mensaje sin bloquear
       } else {
-        // Cerrar otros modales primero
         this.showFortuneWheel = false;
         this.showPaymentModal = false;
 
-        // Guardar el mensaje para procesarlo después del pago
         sessionStorage.setItem('pendingLoveMessage', userMessage);
 
         this.saveStateBeforePayment();
 
-        // Mostrar modal de datos con timeout
         setTimeout(() => {
           this.showDataModal = true;
           this.cdr.markForCheck();
         }, 100);
 
-        return; // Salir aquí para no procesar el mensaje aún
+        return;
       }
     }
 
-    // Procesar mensaje normalmente
     this.processLoveUserMessage(userMessage);
   }
+
   private processLoveUserMessage(userMessage: string): void {
     this.shouldAutoScroll = true;
 
-    // Agregar mensaje del usuario
     const userMsg: ConversationMessage = {
       role: 'user',
       message: userMessage,
@@ -538,7 +494,6 @@ export class CalculadoraAmorComponent
     const compatibilityData =
       this.calculadoraAmorService.getCompatibilityData();
 
-    // Preparar historial de conversación
     const conversationHistoryForService = this.conversationHistory
       .slice(-10)
       .map((msg) => ({
@@ -547,7 +502,6 @@ export class CalculadoraAmorComponent
         message: msg.message,
       }));
 
-    // Enviar al servicio
     this.calculadoraAmorService
       .chatWithLoveExpert(
         userMessage,
@@ -575,7 +529,6 @@ export class CalculadoraAmorComponent
 
             this.shouldAutoScroll = true;
 
-            // ✅ LÓGICA MODIFICADA: Solo bloquear si no tiene consultas gratis Y no ha pagado
             if (
               this.firstQuestionAsked &&
               !this.hasUserPaidForLove &&
@@ -587,11 +540,9 @@ export class CalculadoraAmorComponent
               setTimeout(() => {
                 this.saveStateBeforePayment();
 
-                // Cerrar otros modales
                 this.showFortuneWheel = false;
                 this.showPaymentModal = false;
 
-                // Mostrar modal de datos
                 setTimeout(() => {
                   this.showDataModal = true;
                   this.cdr.markForCheck();
@@ -606,7 +557,7 @@ export class CalculadoraAmorComponent
             this.cdr.markForCheck();
           } else {
             this.handleError(
-              "Erreur lors de la récupération de la réponse de l'expert en amour"
+              "Erreur lors de la récupération de la réponse de l'experte en amour"
             );
           }
         },
@@ -654,14 +605,12 @@ export class CalculadoraAmorComponent
     return message.id === this.blockedMessageId && !this.hasUserPaidForLove;
   }
 
-  // ✅ MÉTODO MIGRADO A PAYPAL
   async promptForPayment(): Promise<void> {
     this.showPaymentModal = true;
     this.cdr.markForCheck();
     this.paymentError = null;
     this.isProcessingPayment = false;
 
-    // Validar datos de usuario
     if (!this.userData) {
       const savedUserData = sessionStorage.getItem('userData');
       if (savedUserData) {
@@ -683,19 +632,18 @@ export class CalculadoraAmorComponent
 
     const email = this.userData.email?.toString().trim();
     if (!email) {
-      this.paymentError = 'E-mail requise. Veuillez remplir le formulaire.';
+      this.paymentError =
+        'Adresse e-mail requise. Veuillez remplir le formulaire.';
       this.showDataModal = true;
       this.cdr.markForCheck();
       return;
     }
 
-    // ✅ Guardar mensaje pendiente si existe
     if (this.currentMessage?.trim()) {
       sessionStorage.setItem('pendingLoveMessage', this.currentMessage.trim());
     }
   }
 
-  // ✅ MÉTODO MIGRADO A PAYPAL
   async handlePaymentSubmit(): Promise<void> {
     this.isProcessingPayment = true;
     this.paymentError = null;
@@ -711,13 +659,12 @@ export class CalculadoraAmorComponent
       });
     } catch (error: any) {
       this.paymentError =
-         error.message || 'Erreur lors de l\'initialisation du paiement PayPal.';
+        error.message || "Erreur lors de l'initialisation du paiement PayPal.";
       this.isProcessingPayment = false;
       this.cdr.markForCheck();
     }
   }
 
-  // ✅ MÉTODO SIMPLIFICADO - PayPal no requiere cleanup
   cancelPayment(): void {
     this.showPaymentModal = false;
     this.isProcessingPayment = false;
@@ -728,22 +675,19 @@ export class CalculadoraAmorComponent
   adjustTextareaHeight(event: any): void {
     const textarea = event.target;
 
-    // Resetear altura para obtener scrollHeight correcto
     textarea.style.height = 'auto';
 
-    // Calcular nueva altura basada en el contenido
     const newHeight = Math.min(
       Math.max(textarea.scrollHeight, this.minTextareaHeight),
       this.maxTextareaHeight
     );
 
-    // Aplicar nueva altura
     this.textareaHeight = newHeight;
     textarea.style.height = newHeight + 'px';
   }
+
   onEnterPressed(event: KeyboardEvent): void {
     if (event.shiftKey) {
-      // Permitir nueva línea con Shift+Enter
       return;
     }
 
@@ -751,45 +695,39 @@ export class CalculadoraAmorComponent
 
     if (this.canSendMessage() && !this.isLoading) {
       this.sendMessage();
-      // Resetear altura del textarea después del envío
       setTimeout(() => {
         this.textareaHeight = this.minTextareaHeight;
       }, 50);
     }
   }
+
   canSendMessage(): boolean {
     return !!(this.currentMessage && this.currentMessage.trim().length > 0);
   }
 
-  // Método para resetear el chat
   resetChat(): void {
-    // Limpiar el historial de conversación
     this.conversationHistory = [];
 
-    // Limpiar el mensaje actual
     this.currentMessage = '';
 
-    // Resetear flags
     this.isLoading = false;
     this.isTyping = false;
 
-    // Agregar mensaje de bienvenida inicial
     this.addWelcomeMessage();
 
-    // Forzar detección de cambios
     this.cdr.markForCheck();
 
-    // Scroll al inicio
     setTimeout(() => {
       this.scrollToBottom();
     }, 100);
   }
+
   private addWelcomeMessage(): void {
     const welcomeMessage = {
       id: Date.now().toString(),
       role: 'love_expert' as const,
       message:
-        "Bonjour! Je suis la Maîtresse Paula, ta guide dans le monde de l'amour et de la compatibilité numérolegique. Comment puis-je t'aider aujourd'hui? 💕",
+        "Bonjour ! Je suis Maîtresse Paula, ta guide dans le monde de l'amour et de la compatibilité numérologique. Comment puis-je t'aider aujourd'hui ? 💕",
       timestamp: new Date(),
       isBlocked: false,
     };
@@ -797,10 +735,7 @@ export class CalculadoraAmorComponent
     this.conversationHistory.push(welcomeMessage);
   }
 
-  // ✅ Métodos de pago movidos arriba - eliminados duplicados
-
   savePersonalData(): void {
-    // Implementar guardado de datos personales si es necesario
     this.showDataForm = false;
   }
 
@@ -832,23 +767,17 @@ export class CalculadoraAmorComponent
     this.cdr.markForCheck();
   }
 
-  /**
-   * TrackBy function para optimizar el rendering de mensajes
-   */
   trackByMessage(index: number, message: ConversationMessage): string {
     return `${message.role}-${message.timestamp.getTime()}-${index}`;
   }
 
-  /**
-   * Formatea la hora de un mensaje
-   */
   formatTime(timestamp: Date | string): string {
     try {
       const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
       if (isNaN(date.getTime())) {
         return 'N/A';
       }
-      return date.toLocaleTimeString('de-DE', {
+      return date.toLocaleTimeString('fr-FR', {
         hour: '2-digit',
         minute: '2-digit',
       });
@@ -876,9 +805,6 @@ export class CalculadoraAmorComponent
     } catch (err) {}
   }
 
-  /**
-   * Formatea una fecha para el servicio
-   */
   private formatDateForService(date: Date): string {
     if (!date) return '';
 
@@ -889,9 +815,6 @@ export class CalculadoraAmorComponent
     return `${day}/${month}/${year}`;
   }
 
-  /**
-   * Marca todos los campos del formulario como tocados
-   */
   private markFormGroupTouched(): void {
     Object.keys(this.compatibilityForm.controls).forEach((key) => {
       const control = this.compatibilityForm.get(key);
@@ -899,9 +822,6 @@ export class CalculadoraAmorComponent
     });
   }
 
-  /**
-   * Verifica si el formulario tiene errores específicos
-   */
   hasFormError(fieldName: string, errorType: string): boolean {
     const field = this.compatibilityForm.get(fieldName);
     return !!(
@@ -911,18 +831,15 @@ export class CalculadoraAmorComponent
     );
   }
 
-  /**
-   * Obtiene el mensaje de error para un campo específico
-   */
   getFieldErrorMessage(fieldName: string): string {
     const field = this.compatibilityForm.get(fieldName);
 
     if (field?.hasError('required')) {
-      return 'Dieses Feld ist erforderlich';
+      return 'Ce champ est obligatoire';
     }
 
     if (field?.hasError('minlength')) {
-      return 'Mindestens 2 Zeichen';
+      return 'Minimum 2 caractères';
     }
 
     return '';
@@ -945,7 +862,7 @@ export class CalculadoraAmorComponent
       if (isNaN(date.getTime())) {
         return 'N/A';
       }
-      return date.toLocaleTimeString('de-DE', {
+      return date.toLocaleTimeString('fr-FR', {
         hour: '2-digit',
         minute: '2-digit',
       });
@@ -959,16 +876,13 @@ export class CalculadoraAmorComponent
 
     let formattedContent = content;
 
-    // Convertir **texto** a <strong>texto</strong> para negrilla
     formattedContent = formattedContent.replace(
       /\*\*(.*?)\*\*/g,
       '<strong>$1</strong>'
     );
 
-    // Convertir saltos de línea a <br> para mejor visualización
     formattedContent = formattedContent.replace(/\n/g, '<br>');
 
-    // Opcional: También puedes manejar *texto* (una sola asterisco) como cursiva
     formattedContent = formattedContent.replace(
       /(?<!\*)\*([^*\n]+)\*(?!\*)/g,
       '<em>$1</em>'
@@ -978,55 +892,50 @@ export class CalculadoraAmorComponent
   }
 
   onUserDataSubmitted(userData: any): void {
-    // ✅ VALIDAR CAMPOS CRÍTICOS ANTES DE PROCEDER
-    const requiredFields = ['email']; // ❌ QUITADO 'apellido'
+    const requiredFields = ['email'];
     const missingFields = requiredFields.filter(
       (field) => !userData[field] || userData[field].toString().trim() === ''
     );
 
     if (missingFields.length > 0) {
       alert(
-        `Pour procéder au paiement, tu dois remplir ce qui suit: ${missingFields.join(
+        `Pour procéder au paiement, tu dois remplir les champs suivants : ${missingFields.join(
           ', '
         )}`
       );
-      this.showDataModal = true; // Mantener modal abierto
+      this.showDataModal = true;
       this.cdr.markForCheck();
       return;
     }
 
-    // ✅ LIMPIAR Y GUARDAR datos INMEDIATAMENTE en memoria Y sessionStorage
     this.userData = {
       ...userData,
       email: userData.email?.toString().trim(),
     };
 
-    // ✅ GUARDAR EN sessionStorage INMEDIATAMENTE
     try {
       sessionStorage.setItem('userData', JSON.stringify(this.userData));
 
-      // Verificar que se guardaron correctamente
       const verificacion = sessionStorage.getItem('userData');
     } catch (error) {}
 
     this.showDataModal = false;
     this.cdr.markForCheck();
 
-    // ✅ NUEVO: Enviar datos al backend como en otros componentes
     this.sendUserDataToBackend(userData);
   }
+
   private sendUserDataToBackend(userData: any): void {
     this.http.post(`${this.backendUrl}api/recolecta`, userData).subscribe({
       next: (response) => {
-        // ✅ LLAMAR A promptForPayment QUE INICIALIZA STRIPE
         this.promptForPayment();
       },
       error: (error) => {
-        // ✅ AUN ASÍ ABRIR EL MODAL DE PAGO
         this.promptForPayment();
       },
     });
   }
+
   onDataModalClosed(): void {
     this.showDataModal = false;
     this.cdr.markForCheck();
@@ -1045,16 +954,14 @@ export class CalculadoraAmorComponent
       ) {
         this.showFortuneWheel = true;
         this.cdr.markForCheck();
-      } else {
       }
     }, delayMs);
   }
 
-  // ✅ MANEJAR PREMIO GANADO
   onPrizeWon(prize: Prize): void {
     const prizeMessage: ConversationMessage = {
       role: 'love_expert',
-      message: `💕 Le vrai amour a conspiré en ta faveur! Tu as gagné: **${prize.name}** ${prize.icon}\n\nLes forces romantiques de l'univers ont décidé de te bénir avec ce cadeau céleste. L'énergie de l'amour coule à travers toi et révèle des secrets plus profonds sur la compatibilité et la romance. Que l'amour éternel t'accompagne!`,
+      message: `💕 Le véritable amour a conspiré en ta faveur ! Tu as gagné : **${prize.name}** ${prize.icon}\n\nLes forces romantiques de l'univers ont décidé de te bénir avec ce cadeau céleste. L'énergie de l'amour coule à travers toi et révèle des secrets plus profonds sur la compatibilité et la romance. Que l'amour éternel t'accompagne !`,
       timestamp: new Date(),
     };
 
@@ -1065,23 +972,20 @@ export class CalculadoraAmorComponent
     this.processLovePrize(prize);
   }
 
-  // ✅ PROCESAR PREMIO ESPECÍFICO
   private processLovePrize(prize: Prize): void {
     switch (prize.id) {
-      case '1': // 3 Lecturas Amorosas
+      case '1':
         this.addFreeLoveConsultations(3);
         break;
-      case '2': // 1 Análisis Premium
+      case '2':
         this.addFreeLoveConsultations(1);
         break;
-      // ✅ ELIMINADO: case '3' - 2 Consultas Extra
-      case '4': // Otra oportunidad
+      case '4':
         break;
       default:
     }
   }
 
-  // ✅ AGREGAR CONSULTAS GRATIS
   private addFreeLoveConsultations(count: number): void {
     const current = parseInt(
       sessionStorage.getItem('freeLoveConsultations') || '0'
@@ -1095,13 +999,13 @@ export class CalculadoraAmorComponent
     }
   }
 
-  // ✅ VERIFICAR CONSULTAS GRATIS DISPONIBLES
   private hasFreeLoveConsultationsAvailable(): boolean {
     const freeConsultations = parseInt(
       sessionStorage.getItem('freeLoveConsultations') || '0'
     );
     return freeConsultations > 0;
   }
+
   private useFreeLoveConsultation(): void {
     const freeConsultations = parseInt(
       sessionStorage.getItem('freeLoveConsultations') || '0'
@@ -1111,10 +1015,9 @@ export class CalculadoraAmorComponent
       const remaining = freeConsultations - 1;
       sessionStorage.setItem('freeLoveConsultations', remaining.toString());
 
-      // Mostrar mensaje informativo
       const prizeMsg: ConversationMessage = {
         role: 'love_expert',
-        message: `✨ *Tu as utilisé une consultation d'amour gratuite* ✨\n\nIl te reste **${remaining}** consultations d'amour gratuites disponibles.`,
+        message: `✨ *Tu as utilisé une consultation d'amour gratuite* ✨\n\nIl te reste **${remaining}** consultation(s) d'amour gratuite(s) disponible(s).`,
         timestamp: new Date(),
       };
       this.conversationHistory.push(prizeMsg);
@@ -1123,12 +1026,10 @@ export class CalculadoraAmorComponent
     }
   }
 
-  // ✅ CERRAR RULETA
   onWheelClosed(): void {
     this.showFortuneWheel = false;
   }
 
-  // ✅ ACTIVAR RULETA MANUALMENTE
   triggerLoveWheel(): void {
     if (this.showPaymentModal || this.showDataModal) {
       return;
@@ -1145,7 +1046,6 @@ export class CalculadoraAmorComponent
     }
   }
 
-  // ✅ OBTENER ESTADO DE SPINS
   getSpinStatus(): string {
     return FortuneWheelComponent.getSpinStatus();
   }

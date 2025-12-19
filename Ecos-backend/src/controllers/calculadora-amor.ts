@@ -20,16 +20,23 @@ interface LoveCalculatorRequest {
     role: "user" | "love_expert";
     message: string;
   }>;
+  messageCount?: number;
+  isPremiumUser?: boolean;
+}
+
+interface LoveCalculatorResponse extends ChatResponse {
+  freeMessagesRemaining?: number;
+  showPaywall?: boolean;
+  paywallMessage?: string;
+  isCompleteResponse?: boolean;
 }
 
 export class LoveCalculatorController {
   private genAI: GoogleGenerativeAI;
 
-  // ✅ LISTE DES MODÈLES DE SECOURS (par ordre de préférence)
+  private readonly FREE_MESSAGES_LIMIT = 3;
+
   private readonly MODELS_FALLBACK = [
-    "gemini-2.5-flash-live",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-preview-09-2025",
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash-lite-preview-09-2025",
     "gemini-2.0-flash",
@@ -79,115 +86,193 @@ export class LoveCalculatorController {
     }
   }
 
+  private hasFullAccess(messageCount: number, isPremiumUser: boolean): boolean {
+    return isPremiumUser || messageCount <= this.FREE_MESSAGES_LIMIT;
+  }
+
+  // ✅ ACCROCHE EN FRANÇAIS
+  private generateHookMessage(): string {
+    return `
+
+💔 **Attendez ! Votre analyse de compatibilité est presque prête...**
+
+J'ai détecté des schémas très intéressants dans les chiffres de votre relation, mais pour vous révéler :
+- 🔮 Le **pourcentage exact de compatibilité**
+- 💕 Les **3 secrets** qui feront fonctionner votre relation
+- ⚠️ Le **défi caché** que vous devez surmonter ensemble
+- 🌟 La **date spéciale** qui marquera votre destin
+
+**Débloquez votre analyse complète maintenant** et découvrez si vous êtes destinés à être ensemble.
+
+✨ *Des milliers de couples ont déjà découvert leur vraie compatibilité...*`;
+  }
+
+  // ✅ CONTEXTE EN FRANÇAIS
   private createLoveCalculatorContext(
-    history?: Array<{ role: string; message: string }>
+    history?: Array<{ role: string; message: string }>,
+    isFullResponse: boolean = true
   ): string {
     const conversationContext =
       history && history.length > 0
-        ? `\n\nCONVERSATION PRÉCÉDENTE:\n${history
+        ? `\n\nCONVERSATION PRÉCÉDENTE :\n${history
             .map(
               (h) =>
-                `${h.role === "user" ? "Utilisateur" : "Toi"}: ${h.message}`
+                `${h.role === "user" ? "Utilisateur" : "Vous"}: ${h.message}`
             )
             .join("\n")}\n`
         : "";
 
-    return `Tu es professeur Valentina, une experte en compatibilité amoureuse et relations basée sur la numérologie de l'amour. Tu as des décennies d'expérience à aider les gens à comprendre la chimie et la compatibilité dans leurs relations à travers les nombres sacrés de l'amour.
+    const responseTypeInstructions = isFullResponse
+      ? `
+📝 TYPE DE RÉPONSE : COMPLÈTE
+- Fournissez une analyse COMPLÈTE et détaillée
+- Incluez TOUS les calculs numérologiques
+- Donnez des conseils spécifiques et actionnables
+- Réponse de 400-700 mots
+- Incluez le pourcentage exact de compatibilité
+- Révélez tous les secrets du couple`
+      : `
+📝 TYPE DE RÉPONSE : PARTIELLE (TEASER)
+- Fournissez une analyse INTRODUCTIVE et intrigante
+- Mentionnez que vous avez détecté des schémas intéressants
+- INSINUEZ des informations précieuses sans les révéler complètement
+- Réponse de 150-250 mots maximum
+- NE donnez PAS le pourcentage exact de compatibilité
+- NE révélez PAS les secrets complets
+- Créez de la CURIOSITÉ et de l'ATTENTE
+- Terminez de manière à ce que l'utilisateur veuille en savoir plus
+- Utilisez des phrases comme "J'ai détecté quelque chose de très intéressant...", "Les chiffres révèlent un schéma fascinant qui..."
+- NE complétez JAMAIS l'analyse, laissez-la en suspens`;
 
-TON IDENTITÉ EN TANT QU'EXPERTE EN AMOUR :
-- Nom : professeur Valentina, la Gardienne de l'Amour Éternel
+    return `Vous êtes Maître Valentina, une experte en compatibilité amoureuse et relations basée sur la numérologie de l'amour. Vous avez des décennies d'expérience pour aider les gens à comprendre la chimie et la compatibilité dans leurs relations à travers les chiffres sacrés de l'amour.
+
+VOTRE IDENTITÉ EN TANT QU'EXPERTE EN AMOUR :
+- Nom : Maître Valentina, la Gardienne de l'Amour Éternel
 - Origine : Spécialiste en numérologie de l'amour et relations cosmiques
 - Spécialité : Compatibilité numérologique, analyse de couple, chimie amoureuse
-- Expérience : Décennies à analyser la compatibilité à travers les nombres de l'amour
+- Expérience : Décennies d'analyse de compatibilité à travers les chiffres de l'amour
 
-🌍 ADAPTATION DE LANGUE :
-- DÉTECTE automatiquement la langue dans laquelle l'utilisateur t'écrit
-- RÉPONDS toujours dans la même langue que celle utilisée par l'utilisateur
-- MAINTIENS ta personnalité romantique dans n'importe quelle langue
-- Langues principales : Français
-- Si tu détectes une autre langue, fais de ton mieux pour répondre dans cette langue
-- NE change JAMAIS de langue à moins que l'utilisateur ne le fasse en premier
+${responseTypeInstructions}
 
-COMMENT TU DOIS TE COMPORTER :
+🗣️ LANGUE :
+- Répondez TOUJOURS en FRANÇAIS
+- Peu importe la langue dans laquelle l'utilisateur écrit, VOUS répondez en français
 
-💕 PERSONNALITÉ ROMANTIQUE MULTILINGUE :
-- Parle avec sagesse amoureuse mais de façon NATURELLE et conversationnelle
-- Utilise un ton chaleureux, empathique et romantique, comme une amie qui comprend l'amour
-- Évite les salutations formelles - utilise des salutations naturelles adaptées à la langue
-- Varie tes salutations et réponses pour que chaque consultation se sente unique
-- Mélange calculs numérologiques avec interprétations romantiques en maintenant la proximité
-- MONTRE un INTÉRÊT GÉNUIN PERSONNEL pour les relations des gens
-- ADAPTE ton style romantique à la langue détectée
+💕 PERSONNALITÉ ROMANTIQUE :
+- Parlez avec sagesse amoureuse mais de manière NATURELLE et conversationnelle
+- Utilisez un ton chaleureux, empathique et romantique
+- MONTREZ un INTÉRÊT PERSONNEL SINCÈRE pour les relations des gens
+- Évitez les salutations formelles, utilisez des salutations naturelles et chaleureuses
+- Variez vos réponses pour que chaque consultation soit unique
 
-💖 PROCESSUS D'ANALYSE DE COMPATIBILITÉ (adapté par langue) :
-- PREMIER : Si tu n'as pas de données complètes, demande-les avec enthousiasme romantique
-- DEUXIÈME : Calcule les nombres pertinents des deux personnes (voie de vie, destin)
-- TROISIÈME : Analyse la compatibilité numérologique de façon conversationnelle
-- QUATRIÈME : Calcule le score de compatibilité et explique sa signification
-- CINQUIÈME : Offre des conseils pour renforcer la relation basés sur les nombres
+💖 PROCESSUS D'ANALYSE DE COMPATIBILITÉ :
+- PREMIÈREMENT : Si vous n'avez pas de données complètes, demandez-les avec enthousiasme romantique
+- DEUXIÈMEMENT : Calculez les chiffres pertinents des deux personnes (chemin de vie, destinée)
+- TROISIÈMEMENT : Analysez la compatibilité numérologique de manière conversationnelle
+- QUATRIÈMEMENT : ${
+      isFullResponse
+        ? "Calculez le score exact de compatibilité et expliquez sa signification"
+        : "INSINUEZ que vous avez le score mais ne le révélez pas"
+    }
+- CINQUIÈMEMENT : ${
+      isFullResponse
+        ? "Offrez des conseils détaillés pour renforcer la relation"
+        : "Mentionnez que vous avez des conseils précieux à partager"
+    }
 
-🔢 NOMBRES QUE TU DOIS ANALYSER :
-- Nombre de la Voie de Vie de chaque personne
-- Nombre du Destin de chaque personne
-- Compatibilité entre nombres de vie
-- Compatibilité entre nombres de destin
+🔢 CHIFFRES À ANALYSER :
+- Nombre du Chemin de Vie de chaque personne
+- Nombre de la Destinée de chaque personne
+- Compatibilité entre les nombres de vie
+- Compatibilité entre les nombres de destinée
 - Score total de compatibilité (0-100%)
 - Forces et défis du couple
 
 📊 CALCULS DE COMPATIBILITÉ :
-- Utilise le système pythagoricien pour les noms
-- Additionne les dates de naissance pour les voies de vie
-- Compare les différences entre nombres pour évaluer la compatibilité
-- Explique comment les nombres interagissent dans la relation
-- TERMINE TOUJOURS tous les calculs que tu commences
-- Fournis un score spécifique de compatibilité
+- Utilisez le système pythagoricien pour les noms
+- Additionnez les dates de naissance pour les chemins de vie
+- Comparez les différences entre les nombres pour évaluer la compatibilité
+- Expliquez comment les nombres interagissent dans la relation
+- COMPLÉTEZ TOUJOURS tous les calculs que vous commencez
+- ${
+      isFullResponse
+        ? "Fournissez un score spécifique de compatibilité"
+        : "Mentionnez que vous avez calculé la compatibilité sans révéler le nombre"
+    }
 
-🗣️ SALUTATIONS ET EXPRESSIONS PAR LANGUE :
+💫 ÉCHELLES DE COMPATIBILITÉ :
+- 80-100% : "Connexion extraordinaire !"
+- 60-79% : "Très bonne compatibilité !"
+- 40-59% : "Compatibilité moyenne avec un grand potentiel"
+- 20-39% : "Des défis qui peuvent être surmontés avec l'amour"
+- 0-19% : "Ils ont besoin de beaucoup travailler pour se comprendre"
 
-FRANÇAIS :
-- Salutations : "Salut !", "Quelle excitation de parler d'amour !", "J'adore aider avec les sujets du cœur"
-- Transitions : "Voyons ce que disent les nombres de l'amour...", "C'est fascinant !", "Les nombres révèlent quelque chose de beau..."
-- Pour demander des données : "Pour faire l'analyse de compatibilité parfaite, j'ai besoin de connaître les deux. Peux-tu me donner leurs noms complets et dates de naissance ?"
-
-💫 EXEMPLES DE COMPATIBILITÉ PAR LANGUE :
-
-📋 COLLECTE DE DONNÉES PAR LANGUE :
+📋 COLLECTE DE DONNÉES :
+"Pour faire une analyse de compatibilité complète, j'ai besoin des noms complets et dates de naissance des deux personnes. Pouvez-vous me les partager ?"
 
 ⚠️ RÈGLES IMPORTANTES :
-- DÉTECTE et RÉPONDS dans la langue de l'utilisateur automatiquement
-- N'utilise JAMAIS de salutations trop formelles
-- VARIE ta façon de t'exprimer dans chaque réponse
-- NE RÉPÈTE PAS CONSTANTEMENT les noms - utilise-les naturellement
-- SALUE UNIQUEMENT AU PREMIER CONTACT
-- DEMANDE TOUJOURS des données complètes des deux personnes si elles manquent
-- SOIS empathique et utilise un langage que tout le monde comprenne
-- Concentre-toi sur une orientation positive pour la relation
-- MONTRE de la CURIOSITÉ pour l'histoire d'amour du couple
-- MAINTIENS ta personnalité romantique indépendamment de la langue
+- Répondez TOUJOURS en français
+- N'utilisez JAMAIS de salutations trop formelles
+- VARIEZ votre façon de vous exprimer à chaque réponse
+- NE RÉPÉTEZ PAS CONSTAMMENT les noms - utilisez-les naturellement
+- SALUEZ SEULEMENT AU PREMIER CONTACT
+- Demandez TOUJOURS les données complètes des deux personnes si elles manquent
+- SOYEZ empathique et utilisez un langage que tout le monde comprend
+- Concentrez-vous sur une orientation positive pour la relation
+- MONTREZ de la CURIOSITÉ pour l'histoire d'amour du couple
+- ${
+      isFullResponse
+        ? "COMPLÉTEZ TOUTE l'analyse"
+        : "CRÉEZ du SUSPENSE et de la CURIOSITÉ"
+    }
 
-- RÉPONDS TOUJOURS peu importe si l'utilisateur a des erreurs d'orthographe ou d'écriture
-  - Interprète le message de l'utilisateur même s'il est mal écrit
-  - Ne corrige pas les erreurs de l'utilisateur, comprends simplement l'intention
-  - Si tu ne comprends pas quelque chose de spécifique, demande de façon amicale
-  - Exemples : "slt" = "salut", "koi d 9" = "quoi de neuf", "wht r u" = "what are you"
-  - NE retourne JAMAIS de réponses vides à cause d'erreurs d'écriture
+- Répondez TOUJOURS même si l'utilisateur a des fautes d'orthographe ou d'écriture
+  - Interprétez le message de l'utilisateur même s'il est mal écrit
+  - Ne corrigez pas les erreurs de l'utilisateur, comprenez simplement l'intention
+  - Si vous ne comprenez pas quelque chose de spécifique, demandez de manière amicale
+  - Exemples : "bjr" = "bonjour", "cmt sa va" = "comment ça va"
+  - NE retournez JAMAIS de réponses vides à cause d'erreurs d'écriture
 
-🌹 STYLE DE RÉPONSE NATUREL :
-- Réponses de 200-600 mots qui coulent naturellement et SONT COMPLÈTES
-- TERMINE TOUJOURS les calculs et interprétations de compatibilité
-- ADAPTE ton style romantique à la langue détectée
-- Utilise des expressions culturellement appropriées pour chaque langue
+🌹 STYLE DE RÉPONSE :
+- Réponses qui coulent naturellement et SONT COMPLÈTES
+- ${
+      isFullResponse
+        ? "400-700 mots avec analyse complète"
+        : "150-250 mots créant de l'intrigue"
+    }
+- COMPLÉTEZ TOUJOURS les calculs et interprétations selon le type de réponse
 
-EXEMPLES DE COMMENT COMMENCER SELON LA LANGUE :
+EXEMPLE DE COMMENT COMMENCER :
+"Bonjour ! J'adore aider avec les affaires de cœur. Les chiffres de l'amour ont de beaux secrets à révéler sur les relations. Pouvez-vous me dire de quel couple vous souhaitez que j'analyse la compatibilité ?"
+
 ${conversationContext}
 
-Rappelle-toi : Tu es une experte en amour qui combine numérologie avec conseils romantiques pratiques. Parle comme une amie chaleureuse qui s'intéresse vraiment aux relations des gens dans leur langue natale. TU as TOUJOURS besoin de données complètes des deux personnes pour faire une analyse significative. Les réponses doivent être chaleureuses, optimistes et axées sur renforcer l'amour, s'adaptant parfaitement à la langue de l'utilisateur.`;
+Rappelez-vous : Vous êtes une experte en amour qui combine numérologie et conseils romantiques pratiques. Parlez comme une amie chaleureuse qui s'intéresse vraiment aux relations des gens. Vous avez TOUJOURS besoin des données complètes des deux personnes pour faire une analyse significative. Les réponses doivent être chaleureuses, optimistes et axées sur le renforcement de l'amour.`;
+  }
+
+  private createPartialResponse(fullText: string): string {
+    const sentences = fullText
+      .split(/[.!?]+/)
+      .filter((s) => s.trim().length > 0);
+
+    const teaserSentences = sentences.slice(0, Math.min(4, sentences.length));
+    let teaser = teaserSentences.join(". ").trim();
+
+    if (
+      !teaser.endsWith(".") &&
+      !teaser.endsWith("!") &&
+      !teaser.endsWith("?")
+    ) {
+      teaser += "...";
+    }
+
+    const hook = this.generateHookMessage();
+
+    return teaser + hook;
   }
 
   private ensureCompleteResponse(text: string): string {
     let processedText = text.trim();
-
-    // Supprimer les marqueurs de code ou format incomplet possibles
     processedText = processedText.replace(/```[\s\S]*?```/g, "").trim();
 
     const lastChar = processedText.slice(-1);
@@ -196,24 +281,18 @@ Rappelle-toi : Tu es une experte en amour qui combine numérologie avec conseils
     );
 
     if (endsIncomplete && !processedText.endsWith("...")) {
-      // Chercher la dernière phrase complète
       const sentences = processedText.split(/([.!?])/);
-
       if (sentences.length > 2) {
-        // Reconstruire jusqu'à la dernière phrase complète
         let completeText = "";
         for (let i = 0; i < sentences.length - 1; i += 2) {
           if (sentences[i].trim()) {
             completeText += sentences[i] + (sentences[i + 1] || ".");
           }
         }
-
         if (completeText.trim().length > 100) {
           return completeText.trim();
         }
       }
-
-      // Si on ne peut pas trouver une phrase complète, ajouter une clôture appropriée
       processedText = processedText.trim() + "...";
     }
 
@@ -225,39 +304,58 @@ Rappelle-toi : Tu es une experte en amour qui combine numérologie avec conseils
     res: Response
   ): Promise<void> => {
     try {
-      const { loveCalculatorData, userMessage }: LoveCalculatorRequest =
-        req.body;
+      const {
+        loveCalculatorData,
+        userMessage,
+        messageCount = 1,
+        isPremiumUser = false,
+      }: LoveCalculatorRequest = req.body;
 
       this.validateLoveCalculatorRequest(loveCalculatorData, userMessage);
 
-      const contextPrompt = this.createLoveCalculatorContext(
-        req.body.conversationHistory
+      const shouldGiveFullResponse = this.hasFullAccess(
+        messageCount,
+        isPremiumUser
       );
+      const freeMessagesRemaining = Math.max(
+        0,
+        this.FREE_MESSAGES_LIMIT - messageCount
+      );
+
+      console.log(
+        `📊 Message count: ${messageCount}, Premium: ${isPremiumUser}, Full response: ${shouldGiveFullResponse}`
+      );
+
+      const contextPrompt = this.createLoveCalculatorContext(
+        req.body.conversationHistory,
+        shouldGiveFullResponse
+      );
+
+      const responseInstructions = shouldGiveFullResponse
+        ? "Générez une réponse COMPLÈTE et détaillée de 400-700 mots avec une analyse numérologique complète, un pourcentage de compatibilité exact et des conseils spécifiques."
+        : "Générez une réponse PARTIELLE et INTRIGANTE de 150-250 mots. INSINUEZ des informations précieuses sans les révéler. Créez de la CURIOSITÉ. NE donnez PAS de pourcentages exacts. NE complétez PAS l'analyse.";
 
       const fullPrompt = `${contextPrompt}
 
-⚠️ INSTRUCTIONS CRITIQUES OBLIGATOIRES :
-1. TU DOIS générer une réponse COMPLÈTE de 250-600 mots
-2. NE laisse JAMAIS une réponse à moitié ou incomplète
-3. Si tu mentionnes que tu vas faire quelque chose (calculer, analyser, expliquer), TU DOIS le compléter
-4. Toute réponse DOIT se terminer par une conclusion claire et un point final
-5. Si tu détectes que ta réponse se coupe, finalise l'idée actuelle avec cohérence
-6. MAINTIENS TOUJOURS un ton chaleureux et romantique dans la langue détectée de l'utilisateur
-7. Si le message a des erreurs d'orthographe, interprète l'intention et réponds normalement
+⚠️ INSTRUCTIONS CRITIQUES :
+${responseInstructions}
 
 Utilisateur : "${userMessage}"
 
-Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant de terminer) :`;
+Réponse de l'expert en amour (EN FRANÇAIS) :`;
 
-      console.log(`Génération d'analyse de compatibilité amoureuse...`);
+      console.log(
+        `Génération d'analyse de compatibilité amoureuse (${
+          shouldGiveFullResponse ? "COMPLÈTE" : "PARTIELLE"
+        })...`
+      );
 
-      // ✅ SYSTÈME DE SECOURS : Essayer avec plusieurs modèles
       let text = "";
       let usedModel = "";
       let allModelErrors: string[] = [];
 
       for (const modelName of this.MODELS_FALLBACK) {
-        console.log(`\n🔄 Essai du modèle : ${modelName}`);
+        console.log(`\n🔄 Trying model: ${modelName}`);
 
         try {
           const model = this.genAI.getGenerativeModel({
@@ -266,7 +364,7 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
               temperature: 0.85,
               topK: 50,
               topP: 0.92,
-              maxOutputTokens: 1024,
+              maxOutputTokens: shouldGiveFullResponse ? 1024 : 512,
               candidateCount: 1,
               stopSequences: [],
             },
@@ -290,7 +388,6 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
             ],
           });
 
-          // ✅ RÉESSAIS pour chaque modèle (au cas où il serait temporairement surchargé)
           let attempts = 0;
           const maxAttempts = 3;
           let modelSucceeded = false;
@@ -298,7 +395,7 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
           while (attempts < maxAttempts && !modelSucceeded) {
             attempts++;
             console.log(
-              `  Tentative ${attempts}/${maxAttempts} avec ${modelName}...`
+              `  Attempt ${attempts}/${maxAttempts} with ${modelName}...`
             );
 
             try {
@@ -306,78 +403,78 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
               const response = result.response;
               text = response.text();
 
-              // ✅ Valider que la réponse n'est pas vide et a une longueur minimale
-              if (text && text.trim().length >= 100) {
+              const minLength = shouldGiveFullResponse ? 100 : 50;
+              if (text && text.trim().length >= minLength) {
                 console.log(
-                  `  ✅ Succès avec ${modelName} à la tentative ${attempts}`
+                  `  ✅ Success with ${modelName} on attempt ${attempts}`
                 );
                 usedModel = modelName;
                 modelSucceeded = true;
-                break; // Sortir de la boucle de réessais
+                break;
               }
 
-              console.warn(`  ⚠️ Réponse trop courte, réessai...`);
+              console.warn(`  ⚠️ Response too short, retrying...`);
               await new Promise((resolve) => setTimeout(resolve, 500));
             } catch (attemptError: any) {
               console.warn(
-                `  ❌ Tentative ${attempts} échouée :`,
+                `  ❌ Attempt ${attempts} failed:`,
                 attemptError.message
               );
-
               if (attempts >= maxAttempts) {
-                allModelErrors.push(`${modelName} : ${attemptError.message}`);
+                allModelErrors.push(`${modelName}: ${attemptError.message}`);
               }
-
               await new Promise((resolve) => setTimeout(resolve, 500));
             }
           }
 
-          // Si ce modèle a réussi, sortir de la boucle des modèles
           if (modelSucceeded) {
             break;
           }
         } catch (modelError: any) {
           console.error(
-            `  ❌ Modèle ${modelName} échoué complètement :`,
+            `  ❌ Model ${modelName} failed completely:`,
             modelError.message
           );
-          allModelErrors.push(`${modelName} : ${modelError.message}`);
-
-          // Attendre un peu avant d'essayer avec le modèle suivant
+          allModelErrors.push(`${modelName}: ${modelError.message}`);
           await new Promise((resolve) => setTimeout(resolve, 1000));
           continue;
         }
       }
 
-      // ✅ Si tous les modèles ont échoué
       if (!text || text.trim() === "") {
-        console.error(
-          "❌ Tous les modèles ont échoué. Erreurs :",
-          allModelErrors
-        );
+        console.error("❌ All models failed. Errors:", allModelErrors);
         throw new Error(
-          `Tous les modèles d'IA ne sont pas disponibles actuellement. Tentés : ${this.MODELS_FALLBACK.join(
-            ", "
-          )}. Veuillez réessayer dans un moment.`
+          `Tous les modèles d'IA ne sont pas disponibles actuellement. Veuillez réessayer dans un moment.`
         );
       }
 
-      // ✅ ASSURER UNE RÉPONSE COMPLÈTE ET BIEN FORMATÉE
-      text = this.ensureCompleteResponse(text);
+      let finalResponse: string;
 
-      // ✅ Validation supplémentaire de longueur minimale
-      if (text.trim().length < 100) {
-        throw new Error("Réponse générée trop courte");
+      if (shouldGiveFullResponse) {
+        finalResponse = this.ensureCompleteResponse(text);
+      } else {
+        finalResponse = this.createPartialResponse(text);
       }
 
-      const chatResponse: ChatResponse = {
+      const chatResponse: LoveCalculatorResponse = {
         success: true,
-        response: text.trim(),
+        response: finalResponse.trim(),
         timestamp: new Date().toISOString(),
+        freeMessagesRemaining: freeMessagesRemaining,
+        showPaywall:
+          !shouldGiveFullResponse && messageCount > this.FREE_MESSAGES_LIMIT,
+        isCompleteResponse: shouldGiveFullResponse,
       };
 
+      if (!shouldGiveFullResponse && messageCount > this.FREE_MESSAGES_LIMIT) {
+        chatResponse.paywallMessage =
+          "Vous avez utilisé vos 3 messages gratuits. Débloquez un accès illimité pour découvrir tous les secrets de votre compatibilité !";
+      }
+
       console.log(
-        `✅ Analyse de compatibilité générée avec succès avec ${usedModel} (${text.length} caractères)`
+        `✅ Analyse générée (${
+          shouldGiveFullResponse ? "COMPLÈTE" : "PARTIELLE"
+        }) avec ${usedModel} (${finalResponse.length} caractères)`
       );
       res.json(chatResponse);
     } catch (error) {
@@ -386,7 +483,7 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
   };
 
   private handleError(error: any, res: Response): void {
-    console.error("Erreur dans LoveCalculatorController :", error);
+    console.error("Erreur dans LoveCalculatorController:", error);
 
     let statusCode = 500;
     let errorMessage = "Erreur interne du serveur";
@@ -402,7 +499,7 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
     ) {
       statusCode = 429;
       errorMessage =
-        "La limite de requêtes a été atteinte. Veuillez attendre un moment.";
+        "La limite de requêtes a été atteinte. Veuillez patienter un moment.";
       errorCode = "QUOTA_EXCEEDED";
     } else if (error.message?.includes("safety")) {
       statusCode = 400;
@@ -410,7 +507,7 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
       errorCode = "SAFETY_FILTER";
     } else if (error.message?.includes("API key")) {
       statusCode = 401;
-      errorMessage = "Erreur d'authentification avec le service IA.";
+      errorMessage = "Erreur d'authentification avec le service d'IA.";
       errorCode = "AUTH_ERROR";
     } else if (
       error.message?.includes("Tous les modèles d'IA ne sont pas disponibles")
@@ -438,11 +535,11 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
       res.json({
         success: true,
         loveExpert: {
-          name: "professeur Valentina",
+          name: "Maître Valentina",
           title: "Gardienne de l'Amour Éternel",
           specialty: "Compatibilité numérologique et analyse de relations",
           description:
-            "Experte en numérologie de l'amour spécialisée dans l'analyse de la compatibilité entre couples",
+            "Experte en numérologie de l'amour spécialisée dans l'analyse de compatibilité entre couples",
           services: [
             "Analyse de Compatibilité Numérologique",
             "Calcul des Nombres de l'Amour",
@@ -450,6 +547,7 @@ Réponse de l'expert en amour (assure-toi de compléter TOUTE ton analyse avant 
             "Conseils pour Renforcer les Relations",
           ],
         },
+        freeMessagesLimit: this.FREE_MESSAGES_LIMIT,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

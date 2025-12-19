@@ -4,7 +4,7 @@
     <!-- Google tag (gtag.js) -->
     <script
       async
-      src="https://www.googletagmanager.com/gtag/js?id=G-Z5X0EB5ZP7"
+      src="https://www.googletagmanager.com/gtag/js?id=GT-K5QNXGSM"
     ></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -13,11 +13,10 @@
       }
       gtag("js", new Date());
 
-      gtag("config", "G-Z5X0EB5ZP7");
+      gtag("config", "GT-K5QNXGSM");
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
     <!-- Google Tag Manager -->
     <script>
       (function (w, d, s, l, i) {
@@ -29,7 +28,7 @@
         j.async = true;
         j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
         f.parentNode.insertBefore(j, f);
-      })(window, document, "script", "dataLayer", "GTM-NJKTJJ83");
+      })(window, document, "script", "dataLayer", "GTM-NM5V9XQ2");
     </script>
     <!-- End Google Tag Manager -->
   </head>
@@ -37,42 +36,41 @@
     <!-- Google Tag Manager (noscript) -->
     <noscript
       ><iframe
-        src="https://www.googletagmanager.com/ns.html?id=GTM-NJKTJJ83"
+        src="https://www.googletagmanager.com/ns.html?id=GTM-NM5V9XQ2"
         height="0"
         width="0"
         style="display: none; visibility: hidden"
       ></iframe
     ></noscript>
     <!-- End Google Tag Manager (noscript) -->
-
-    <!-- Video de fondo -->
+    <!-- Vidéo de fond -->
     <video autoplay muted loop playsinline class="background-video">
       <source src="/MAPA-VOCACIONAL.mp4" type="video/mp4" />
       Votre navigateur ne prend pas en charge les vidéos HTML5.
     </video>
 
-    <!-- Overlay opcional para mejorar legibilidad -->
+    <!-- Overlay optionnel pour améliorer la lisibilité -->
     <div class="video-overlay"></div>
     <div class="main-content">
       <div class="vocational-container">
-        <!-- Header del consejero -->
+        <!-- En-tête du conseiller -->
         <div class="counselor-header">
           <div class="counselor-info">
             <div class="interpreter-avatar">
               <img
                 class="mystical-orb-image"
                 src="/Maestra-4.webp"
-                alt="Avatar de la Maîtresse"
+                alt="Avatar Maître"
               />
             </div>
             <div class="interpreter-details">
-              <!-- Primera línea: nombre + icono + título juntos -->
+              <!-- Première ligne : nom + icône + titre ensemble -->
               <div class="name-title-row">
                 <h3>{{ counselorInfo.name }}</h3>
                 <span class="separator-icon">»</span>
                 <p class="interpreter-title">{{ counselorInfo.title }}</p>
               </div>
-              <!-- Segunda línea: especialidad debajo EN MAYÚSCULAS -->
+              <!-- Deuxième ligne : spécialité en dessous EN MAJUSCULES -->
               <p class="interpreter-specialty">{{ counselorInfo.specialty }}</p>
             </div>
           </div>
@@ -92,11 +90,11 @@
           </button>
         </div>
 
-        <!-- Contenido de pestañas -->
+        <!-- Contenu des onglets -->
         <div class="tab-content">
-          <!-- TAB: CHAT -->
+          <!-- ONGLET : CHAT -->
           <div *ngIf="currentTab === 'chat'" class="chat-section">
-            <!-- Área de mensajes -->
+            <!-- Zone des messages -->
             <div
               class="chat-messages"
               #chatContainer
@@ -120,23 +118,23 @@
                     *ngIf="!message.isUser"
                     class="interpreter-avatar-small"
                     src="/Maestra-4.webp"
-                    alt="Avatar de la Maîtresse"
+                    alt="Avatar Maître"
                   />
                 </div>
 
                 <div class="message-content">
-                  <!-- CONTENIDO ORIGINAL (se difumina si está bloqueado) -->
+                  <!-- CONTENU ORIGINAL (devient flou si bloqué) -->
                   <div [class.blurred-content]="isMessageBlocked(message)">
                     <div class="message-text">
                       <div [innerHTML]="formatMessage(message.content)"></div>
-                      <!-- HORA DENTRO DE LA BURBUJA DE TEXTO -->
+                      <!-- HEURE À L'INTÉRIEUR DE LA BULLE DE TEXTE -->
                       <div class="message-time-inside">
                         {{ getTimeString(message.timestamp) }}
                       </div>
                     </div>
                   </div>
 
-                  <!-- OVERLAY DE PAGO (solo aparece si está bloqueado) -->
+                  <!-- OVERLAY DE PAIEMENT (apparaît uniquement si bloqué) -->
                   <div
                     *ngIf="isMessageBlocked(message)"
                     class="message-payment-overlay"
@@ -145,27 +143,27 @@
                       <span class="lock-icon">🔒</span>
                       <p><strong>Contenu Premium</strong></p>
                       <p>
-                        Paie 4.00€ pour voir cette orientation professionnelle
+                        Payez 4,00€ pour voir cette orientation professionnelle
                         et accéder à des consultations illimitées
                       </p>
                       <button
                         (click)="promptForPayment()"
                         class="unlock-button"
                       >
-                        💳 Débloquer pour 4.00€
+                        💳 Débloquer pour 4,00€
                       </button>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- Indicador de carga -->
+              <!-- Indicateur de chargement -->
               <div *ngIf="isLoading" class="loading-message">
                 <div class="loading-avatar">
                   <img
                     class="interpreter-avatar-small"
                     src="/Maestra-4.webp"
-                    alt="Avatar de la Maîtresse"
+                    alt="Avatar Maître"
                   />
                 </div>
                 <div class="loading-content">
@@ -175,12 +173,12 @@
                     <span></span>
                   </div>
                   <p class="loading-text">
-                    Dr. Valeria analyse ta consultation...
+                    Dr. Valérie analyse votre demande...
                   </p>
                 </div>
               </div>
             </div>
-            <!-- Área de entrada de mensajes -->
+            <!-- Zone de saisie des messages -->
             <div class="chat-input-area">
               <div class="input-container">
                 <div class="text-input-wrapper">
@@ -189,7 +187,7 @@
                     [(ngModel)]="currentMessage"
                     (keydown)="onKeyPress($event)"
                     (input)="autoResize($event)"
-                    placeholder="Écris ta consultation vocationnelle..."
+                    placeholder="Écrivez votre question professionnelle..."
                     rows="1"
                     maxlength="1500"
                     [disabled]="isLoading"
@@ -219,11 +217,11 @@
             </div>
           </div>
 
-          <!-- MODAL DE PAGO -->
+          <!-- MODAL DE PAIEMENT -->
           <div *ngIf="showPaymentModal" class="payment-modal-overlay">
             <div class="payment-modal">
               <div class="payment-header">
-                <h3>🎯 Débloque l'Orientation Professionnelle Illimitée</h3>
+                <h3>🎯 Débloquez l'Orientation Professionnelle Illimitée</h3>
                 <button (click)="cancelPayment()" class="close-payment-button">
                   ✕
                 </button>
@@ -231,15 +229,17 @@
 
               <div class="payment-content">
                 <div class="payment-info">
-                  <p>Première consultation vocationnelle gratuite terminée.</p>
                   <p>
-                    Pour continuer à explorer ton chemin professionnel de
+                    Première consultation professionnelle gratuite terminée.
+                  </p>
+                  <p>
+                    Pour continuer à explorer votre parcours professionnel de
                     manière illimitée :
                   </p>
                 </div>
 
                 <div class="payment-price">
-                  <span class="price-amount">4.00€</span>
+                  <span class="price-amount">4,00€</span>
                   <span class="price-description"
                     >Accès complet à l'orientation professionnelle</span
                   >
@@ -255,7 +255,7 @@
                   class="payment-element-container"
                   [hidden]="isProcessingPayment"
                 >
-                  <!-- Stripe Payment Element se monta aquí -->
+                  <!-- Stripe Payment Element se monte ici -->
                 </div>
 
                 <div *ngIf="paymentError" class="payment-error">
@@ -271,7 +271,9 @@
                     <span *ngIf="!isProcessingPayment"
                       >💳 Payer et Continuer</span
                     >
-                    <span *ngIf="isProcessingPayment">Traitement...</span>
+                    <span *ngIf="isProcessingPayment"
+                      >Traitement en cours...</span
+                    >
                   </button>
                 </div>
               </div>
@@ -285,13 +287,6 @@
         (onModalClosed)="onDataModalClosed()"
       >
       </app-recolecta-datos>
-      <app-fortune-wheel
-        [isVisible]="showFortuneWheel"
-        [prizes]="vocationalPrizes"
-        (onPrizeWon)="onPrizeWon($event)"
-        (onWheelClosed)="onWheelClosed()"
-      >
-      </app-fortune-wheel>
     </div>
   </body>
 </html>

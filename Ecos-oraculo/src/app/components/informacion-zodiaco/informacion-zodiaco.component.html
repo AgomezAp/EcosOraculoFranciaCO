@@ -61,7 +61,7 @@
               <img
                 class="mystical-orb-image"
                 src="/Maestra-2.webp"
-                alt="Maestra Avatar"
+                alt="Avatar de la Maîtresse"
               />
             </div>
             <div class="interpreter-details">
@@ -114,7 +114,7 @@
                     <img
                       class="interpreter-avatar-small"
                       src="/Maestra-2.webp"
-                      alt="Maestra Avatar"
+                      alt="Avatar de la Maîtresse"
                     />
                   </div>
 
@@ -140,14 +140,14 @@
                           <span class="lock-icon">🔒</span>
                           <p><strong>Contenu Premium</strong></p>
                           <p>
-                            Payez 4.00€ pour voir cette interprétation astrale
+                            Paye 4,00 € pour voir cette interprétation astrale
                             et accéder à des consultations illimitées
                           </p>
                           <button
                             (click)="promptForPayment()"
                             class="unlock-button"
                           >
-                            💳 Débloquer pour 4.00€
+                            💳 Débloquer pour 4,00 €
                           </button>
                         </div>
                       </div>
@@ -165,7 +165,7 @@
                     <img
                       class="user-avatar-image"
                       src="/Visitante.webp"
-                      alt="Usuario Avatar"
+                      alt="Avatar Utilisateur"
                     />
                   </div>
 
@@ -187,7 +187,7 @@
                     <img
                       class="interpreter-avatar-small"
                       src="/Maestra-2.webp"
-                      alt="Maestra Avatar"
+                      alt="Avatar de la Maîtresse"
                     />
                   </div>
                   <div class="message-content">
@@ -198,7 +198,7 @@
                         <span></span>
                       </div>
                       <p class="typing-text">
-                        Maestra Carla consulte les étoiles...
+                        Maîtresse Carla consulte les étoiles...
                       </p>
                     </div>
                   </div>
@@ -213,7 +213,7 @@
                 <textarea
                   class="message-input"
                   [(ngModel)]="currentMessage"
-                  placeholder="Posez une question sur l'astrologie et les signes du zodiaque..."
+                  placeholder="Pose ta question sur l'astrologie et les signes du zodiaque..."
                   rows="1"
                   maxlength="1500"
                   (keydown)="onKeyPress($event)"
@@ -251,7 +251,7 @@
       <div *ngIf="showPaymentModal" class="payment-modal-overlay">
         <div class="payment-modal">
           <div class="payment-header">
-            <h3>🌟 Débloquez les Consultations Astrales Illimitées</h3>
+            <h3>🌟 Débloquer les Consultations Astrales Illimitées</h3>
             <button (click)="cancelPayment()" class="close-payment-button">
               ✕
             </button>
@@ -260,11 +260,13 @@
           <div class="payment-content">
             <div class="payment-info">
               <p>Première consultation gratuite terminée.</p>
-              <p>Pour continuer à consulter les astres sans limites :</p>
+              <p>
+                Pour continuer à consulter les astres de manière illimitée :
+              </p>
             </div>
 
             <div class="payment-price">
-              <span class="price-amount">4.00€</span>
+              <span class="price-amount">4,00 €</span>
               <span class="price-description"
                 >Accès complet aux interprétations astrales</span
               >
@@ -294,7 +296,7 @@
                 class="pay-button"
               >
                 <span *ngIf="!isProcessingPayment">💳 Payer et Continuer</span>
-                <span *ngIf="isProcessingPayment">Traitement...</span>
+                <span *ngIf="isProcessingPayment">Traitement en cours...</span>
               </button>
             </div>
           </div>
@@ -306,13 +308,6 @@
         (onModalClosed)="onDataModalClosed()"
       >
       </app-recolecta-datos>
-      <app-fortune-wheel
-        [isVisible]="showFortuneWheel"
-        [prizes]="astralPrizes"
-        (onPrizeWon)="onPrizeWon($event)"
-        (onWheelClosed)="onWheelClosed()"
-      >
-      </app-fortune-wheel>
     </div>
   </body>
 </html>

@@ -11,31 +11,31 @@
       Votre navigateur ne prend pas en charge les vidéos HTML5.
     </video>
 
-    <!-- Overlay optionnel pour améliorer la lisibilité -->
+    <!-- Overlay opcional para mejorar legibilidad -->
     <div class="video-overlay"></div>
 
     <div class="oracle-container">
       <div class="content-with-navbar">
         <div class="oracle-main">
-          <!-- ===== INFORMATION DU GUIDE ===== -->
+          <!-- ===== INFORMACIÓN DEL GUÍA ===== -->
           <div class="interpreter-info">
             <div class="interpreter-avatar">
               <img
                 class="mystical-orb-image"
                 src="/Maestra-5.webp"
-                alt="Avatar de la Maîtresse"
+                alt="Avatar de la Chamane"
               />
             </div>
             <div class="interpreter-details">
-              <!-- Première ligne : nom + icône + titre ensemble -->
+              <!-- Primera línea: nombre + icono + título juntos -->
               <div class="name-title-row">
                 <h3>Chamane Kiara</h3>
                 <span class="separator-icon">»</span>
                 <p class="interpreter-title">Guide des Animaux Intérieurs</p>
               </div>
-              <!-- Deuxième ligne : spécialité en dessous EN MAJUSCULES -->
+              <!-- Segunda línea: especialidad debajo EN MAYÚSCULAS -->
               <p class="interpreter-specialty">
-                Spécialiste en connexion spirituelle avec le royaume animal
+                Spécialiste en connexion spirituelle avec le règne animal
               </p>
             </div>
             <button
@@ -59,7 +59,7 @@
             </button>
           </div>
 
-          <!-- ===== ZONE DE CHAT ===== -->
+          <!-- ===== ÁREA DE CHAT ===== -->
           <div class="chat-area">
             <div
               class="messages-container"
@@ -68,7 +68,7 @@
               (mousedown)="onUserStartScroll()"
               (wheel)="onUserStartScroll()"
             >
-              <!-- Messages normaux -->
+              <!-- Mensajes normales -->
               <div
                 *ngFor="let message of chatMessages"
                 class="message"
@@ -94,7 +94,7 @@
                     *ngIf="!message.isUser"
                     class="interpreter-avatar-small"
                     src="/Maestra-5.webp"
-                    alt="Avatar de la Maîtresse"
+                    alt="Avatar de la Chamane"
                   />
                 </div>
 
@@ -110,7 +110,7 @@
                   </div>
                 </div>
 
-                <!-- Overlay de paiement pour messages bloqués -->
+                <!-- Overlay de pago para mensajes bloqueados -->
                 <div
                   *ngIf="isMessageBlocked(message)"
                   class="message-payment-overlay"
@@ -119,22 +119,23 @@
                     <span class="lock-icon">🔒</span>
                     <p>Contenu premium !</p>
                     <p>
-                      Débloquez des consultations illimitées avec votre guide spirituel
+                      Débloquez des consultations illimitées avec votre guide
+                      spirituel
                     </p>
                     <button class="unlock-button" (click)="promptForPayment()">
-                      Débloquer pour 4.00€
+                      Débloquer pour 4,00 €
                     </button>
                   </div>
                 </div>
               </div>
 
-              <!-- Indicateur de frappe -->
+              <!-- Indicador de carga -->
               <div *ngIf="isLoading" class="message typing-indicator">
                 <div class="message-avatar interpreter-avatar-small">
                   <img
                     class="interpreter-avatar-small"
                     src="/Maestra-5.webp"
-                    alt="Avatar de la Maîtresse"
+                    alt="Avatar de la Chamane"
                   />
                 </div>
                 <div class="message-content">
@@ -145,14 +146,14 @@
                       <span></span>
                     </div>
                     <p class="typing-text">
-                      Chamane Kiara analyse votre question...
+                      Chamane Kiara analyse votre consultation...
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- ===== ZONE DE SAISIE ===== -->
+            <!-- ===== ÁREA DE ENTRADA ===== -->
           </div>
           <div class="input-area">
             <div class="input-container">
@@ -199,7 +200,7 @@
       </app-recolecta-datos>
     </div>
 
-    <!-- ===== MODAL DE PAIEMENT ===== -->
+    <!-- ===== MODAL DE PAGO ===== -->
     <div *ngIf="showPaymentModal" class="payment-modal-overlay">
       <div class="payment-modal">
         <div class="payment-header">
@@ -216,14 +217,11 @@
           </div>
 
           <div class="payment-price">
-            <span class="price-amount">4.00€</span>
+            <span class="price-amount">4,00 €</span>
             <p class="price-description">Accès complet et illimité</p>
           </div>
 
-          <div
-            *ngIf="isProcessingPayment "
-            class="payment-loading"
-          >
+          <div *ngIf="isProcessingPayment" class="payment-loading">
             <div class="loading-spinner"></div>
             <p>Préparation du paiement...</p>
           </div>
@@ -245,18 +243,13 @@
               (click)="handlePaymentSubmit()"
               [disabled]="isProcessingPayment"
             >
-              {{ isProcessingPayment ? "Traitement..." : "Payer 4.00€" }}
+              {{
+                isProcessingPayment ? "Traitement en cours..." : "Payer 4,00 €"
+              }}
             </button>
           </div>
         </div>
       </div>
     </div>
-    <app-fortune-wheel
-      [isVisible]="showFortuneWheel"
-      [prizes]="animalPrizes"
-      (onPrizeWon)="onPrizeWon($event)"
-      (onWheelClosed)="onWheelClosed()"
-    >
-    </app-fortune-wheel>
   </body>
 </html>

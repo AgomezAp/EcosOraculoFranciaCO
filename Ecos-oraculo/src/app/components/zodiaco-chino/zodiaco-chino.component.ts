@@ -60,6 +60,7 @@ interface ZodiacAnimal {
   element?: string;
   traits?: string[];
 }
+
 @Component({
   selector: 'app-zodiaco-chino',
   imports: [
@@ -73,7 +74,6 @@ interface ZodiacAnimal {
     MatIconModule,
     MatProgressSpinnerModule,
     RecolectaDatosComponent,
-    FortuneWheelComponent,
   ],
   templateUrl: './zodiaco-chino.component.html',
   styleUrl: './zodiaco-chino.component.css',
@@ -84,7 +84,7 @@ export class ZodiacoChinoComponent
 {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef;
 
-  // Propiedades principales
+  // Propriétés principales
   masterInfo: MasterInfo | null = null;
   userForm: FormGroup;
   isFormCompleted = false;
@@ -97,22 +97,22 @@ export class ZodiacoChinoComponent
   private shouldScrollToBottom = false;
   private shouldAutoScroll = true;
   private lastMessageCount = 0;
-  //Variables para control de fortuna
+
+  // Variables pour le contrôle de la roue de la fortune
   showFortuneWheel: boolean = false;
   horoscopePrizes: Prize[] = [
     {
       id: '1',
-      name: '3 tours de la roue du zodiaque',
+      name: '3 tours de la Roue du Signe du Zodiaque',
       color: '#4ecdc4',
       icon: '🔮',
     },
     {
       id: '2',
-      name: '1 Analyse Premium du signe',
+      name: '1 Analyse Premium du Signe du Zodiaque',
       color: '#45b7d1',
       icon: '✨',
     },
-    // ✅ ELIMINADO: { id: '3', name: '2 Consultas Astrológicas Extra', color: '#ffeaa7', icon: '🌟' },
     {
       id: '4',
       name: 'Réessayez !',
@@ -121,16 +121,20 @@ export class ZodiacoChinoComponent
     },
   ];
   private wheelTimer: any;
-  // Variables para control de pagos
-  showPaymentModal: boolean = false;
 
+  // Variables pour le contrôle des paiements
+  showPaymentModal: boolean = false;
   clientSecret: string | null = null;
   isProcessingPayment: boolean = false;
   paymentError: string | null = null;
   hasUserPaidForHoroscope: boolean = false;
-  firstQuestionAsked: boolean = false;
   blockedMessageId: string | null = null;
-  //Datos para enviar
+
+  // ✅ NOUVEAU : Système de 3 messages gratuits
+  private userMessageCount: number = 0;
+  private readonly FREE_MESSAGES_LIMIT = 3;
+
+  // Données à envoyer
   showDataModal: boolean = false;
   userData: any = null;
   private backendUrl = environment.apiUrl;
@@ -143,7 +147,7 @@ export class ZodiacoChinoComponent
     private cdr: ChangeDetectorRef,
     private paypalService: PaypalService
   ) {
-    // Configuración del formulario para horóscopo
+    // Configuration du formulaire pour l'horoscope
     this.userForm = this.fb.group({
       fullName: [''],
       birthYear: [
@@ -156,9 +160,11 @@ export class ZodiacoChinoComponent
       ],
     });
   }
+
   ngAfterViewInit(): void {
-    this.setVideosSpeed(0.7); // 0.5 = más lento, 1 = normal
+    this.setVideosSpeed(0.7); // 0.5 = plus lent, 1 = normal
   }
+
   private setVideosSpeed(rate: number): void {
     const host = this.elRef.nativeElement;
     const videos = host.querySelectorAll<HTMLVideoElement>('video');
@@ -168,10 +174,11 @@ export class ZodiacoChinoComponent
       else v.addEventListener('loadedmetadata', apply, { once: true });
     });
   }
+
   async ngOnInit(): Promise<void> {
-    // ✅ Verificar si venimos de PayPal después de un pago
+    // ✅ Vérifier si nous venons de PayPal après un paiement
     this.hasUserPaidForHoroscope =
-      sessionStorage.getItem('hasUserPaidForHoroscope_horoscope') === 'true';
+      sessionStorage.getItem('hasUserPaidForHoroscope_horoskop') === 'true';
 
     const paymentStatus = this.paypalService.checkPaymentStatusFromUrl();
 
@@ -182,37 +189,37 @@ export class ZodiacoChinoComponent
         );
 
         if (verification.valid && verification.status === 'approved') {
-          // ✅ Pago SOLO para este servicio (Horoscope)
+          // ✅ Paiement UNIQUEMENT pour ce service (Horoscope)
           this.hasUserPaidForHoroscope = true;
-          sessionStorage.setItem('hasUserPaidForHoroscope_horoscope', 'true');
+          sessionStorage.setItem('hasUserPaidForHoroscope_horoskop', 'true');
 
-          // NO usar localStorage global
+          // NE PAS utiliser localStorage global
           localStorage.removeItem('paypal_payment_completed');
 
           this.blockedMessageId = null;
           sessionStorage.removeItem('horoscopeBlockedMessageId');
 
-          // Limpiar URL
+          // Nettoyer l'URL
           window.history.replaceState(
             {},
             document.title,
             window.location.pathname
           );
 
-          // Cerrar modal de pago
+          // Fermer le modal de paiement
           this.showPaymentModal = false;
           this.isProcessingPayment = false;
           this.paymentError = null;
           this.cdr.markForCheck();
 
-          // ✅ MENSAJE DE CONFIRMACIÓN (usando firma correcta de addMessage)
+          // ✅ MESSAGE DE CONFIRMATION (utilisant la signature correcte de addMessage)
           setTimeout(() => {
             this.addMessage(
               'master',
               '🎉 Paiement effectué avec succès !\n\n' +
-                "✨ Merci pour votre paiement. Vous avez maintenant un accès complet à l'Horoscope.\n\n" +
+                "✨ Merci pour votre paiement. Vous avez maintenant un accès complet à l'Horoscope Chinois.\n\n" +
                 '🐉 Découvrons ensemble votre avenir astrologique !\n\n' +
-                '📌 Remarque : Ce paiement est uniquement valable pour le service Horoscope. Pour les autres services, un paiement séparé est requis.'
+                "📌 Note : Ce paiement est valable uniquement pour le service d'Horoscope. Pour d'autres services, un paiement séparé est requis."
             );
             this.cdr.detectChanges();
             setTimeout(() => this.scrollToBottom(), 200);
@@ -223,22 +230,34 @@ export class ZodiacoChinoComponent
           setTimeout(() => {
             this.addMessage(
               'master',
-              '⚠️ Il y a eu un problème lors de la vérification de votre paiement. Veuillez réessayer ou contacter notre support.'
+              '⚠️ Un problème est survenu lors de la vérification de votre paiement. Veuillez réessayer ou contacter notre support.'
             );
             this.cdr.detectChanges();
           }, 800);
         }
       } catch (error) {
+        console.error(
+          'Erreur lors de la vérification du paiement PayPal :',
+          error
+        );
         this.paymentError = 'Erreur lors de la vérification du paiement';
 
         setTimeout(() => {
           this.addMessage(
             'master',
-            '❌ Une erreur est survenue lors de la vérification du paiement. Veuillez réessayer plus tard.'
+            "❌ Malheureusement, une erreur s'est produite lors de la vérification de votre paiement. Veuillez réessayer plus tard."
           );
           this.cdr.detectChanges();
         }, 800);
       }
+    }
+
+    // ✅ NOUVEAU : Charger le compteur de messages
+    const savedMessageCount = sessionStorage.getItem(
+      'horoscopeUserMessageCount'
+    );
+    if (savedMessageCount) {
+      this.userMessageCount = parseInt(savedMessageCount, 10);
     }
 
     const savedUserData = sessionStorage.getItem('userData');
@@ -252,19 +271,19 @@ export class ZodiacoChinoComponent
       this.userData = null;
     }
 
-    // Cargar datos guardados específicos del horóscopo
+    // Charger les données sauvegardées spécifiques à l'horoscope
     this.loadHoroscopeData();
 
-    // ✅ PayPal verifica en ngOnInit() arriba - ya no necesitamos checkHoroscopePaymentStatus()
+    // ✅ PayPal vérifie dans ngOnInit() ci-dessus - nous n'avons plus besoin de checkHoroscopePaymentStatus()
 
     this.loadMasterInfo();
 
-    // Solo agregar mensaje de bienvenida si no hay mensajes guardados
+    // Ajouter le message de bienvenue uniquement s'il n'y a pas de messages sauvegardés
     if (this.conversationHistory.length === 0) {
       this.initializeHoroscopeWelcomeMessage();
     }
 
-    // ✅ TAMBIÉN VERIFICAR PARA MENSAJES RESTAURADOS
+    // ✅ ÉGALEMENT VÉRIFIER POUR LES MESSAGES RESTAURÉS
     if (
       this.conversationHistory.length > 0 &&
       FortuneWheelComponent.canShowWheel()
@@ -272,11 +291,9 @@ export class ZodiacoChinoComponent
       this.showHoroscopeWheelAfterDelay(2000);
     }
   }
+
   private loadHoroscopeData(): void {
     const savedMessages = sessionStorage.getItem('horoscopeMessages');
-    const savedFirstQuestion = sessionStorage.getItem(
-      'horoscopeFirstQuestionAsked'
-    );
     const savedBlockedMessageId = sessionStorage.getItem(
       'horoscopeBlockedMessageId'
     );
@@ -288,7 +305,6 @@ export class ZodiacoChinoComponent
           ...msg,
           timestamp: msg.timestamp,
         }));
-        this.firstQuestionAsked = savedFirstQuestion === 'true';
         this.blockedMessageId = savedBlockedMessageId || null;
       } catch (error) {
         this.clearHoroscopeSessionData();
@@ -296,12 +312,13 @@ export class ZodiacoChinoComponent
       }
     }
   }
+
   private initializeHoroscopeWelcomeMessage(): void {
-    const welcomeMessage = `Bienvenue dans le royaume des étoiles ! 🔮✨
+    const welcomeMessage = `Bienvenue au Royaume des Étoiles ! 🔮✨
 
-Je suis l'astrologue María, guide céleste des signes du zodiaque. Pendant des décennies, j'ai étudié les influences des planètes et des constellations qui régissent notre destin.
+Je suis l'Astrologue Marie, guide céleste des signes du zodiaque. Depuis des décennies, j'étudie les influences des planètes et des constellations qui guident notre destin.
 
-Chaque personne naît sous la protection d'un signe zodiacal qui influence sa personnalité, son destin et son chemin de vie. Pour révéler les secrets de votre horoscope et les influences célestes, j'ai besoin de votre date de naissance.
+Chaque personne naît sous la protection d'un signe du zodiaque qui influence sa personnalité, son destin et son chemin de vie. Pour révéler les secrets de votre horoscope et les influences célestes, j'ai besoin de votre date de naissance.
 
 Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Scorpion, Sagittaire, Capricorne, Verseau et Poissons) ont une sagesse ancestrale à partager.
 
@@ -309,12 +326,13 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
 
     this.addMessage('master', welcomeMessage);
 
-    // ✅ VERIFICACIÓN DE RULETA HOROSCÓPICA
+    // ✅ VÉRIFICATION DE LA ROUE HOROSCOPIQUE
     if (FortuneWheelComponent.canShowWheel()) {
       this.showHoroscopeWheelAfterDelay(3000);
     } else {
     }
   }
+
   ngAfterViewChecked(): void {
     if (this.shouldScrollToBottom) {
       this.scrollToBottom();
@@ -334,10 +352,10 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     if (this.wheelTimer) {
       clearTimeout(this.wheelTimer);
     }
-    // ✅ PayPal no requiere limpieza de elementos
+    // ✅ PayPal ne nécessite pas de nettoyage d'éléments
   }
 
-  // ✅ Método eliminado - PayPal maneja verificación en ngOnInit()
+  // ✅ Méthode supprimée - PayPal gère la vérification dans ngOnInit()
 
   private saveHoroscopeMessagesToSession(): void {
     try {
@@ -355,15 +373,17 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
   private clearHoroscopeSessionData(): void {
     sessionStorage.removeItem('hasUserPaidForHoroscope');
     sessionStorage.removeItem('horoscopeMessages');
-    sessionStorage.removeItem('horoscopeFirstQuestionAsked');
     sessionStorage.removeItem('horoscopeBlockedMessageId');
+    sessionStorage.removeItem('horoscopeUserMessageCount');
+    sessionStorage.removeItem('freeHoroscopeConsultations');
+    sessionStorage.removeItem('pendingHoroscopeMessage');
   }
 
   private saveHoroscopeStateBeforePayment(): void {
     this.saveHoroscopeMessagesToSession();
     sessionStorage.setItem(
-      'horoscopeFirstQuestionAsked',
-      this.firstQuestionAsked.toString()
+      'horoscopeUserMessageCount',
+      this.userMessageCount.toString()
     );
     if (this.blockedMessageId) {
       sessionStorage.setItem(
@@ -379,14 +399,14 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     );
   }
 
-  // ✅ MÉTODO MIGRADO A PAYPAL
+  // ✅ MÉTHODE MIGRÉE VERS PAYPAL
   async promptForHoroscopePayment(): Promise<void> {
     this.showPaymentModal = true;
     this.cdr.markForCheck();
     this.paymentError = null;
     this.isProcessingPayment = false;
 
-    // Validar datos de usuario
+    // Valider les données de l'utilisateur
     if (!this.userData) {
       const savedUserData = sessionStorage.getItem('userData');
       if (savedUserData) {
@@ -400,35 +420,34 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
 
     if (!this.userData) {
       this.paymentError =
-        "Aucune donnée client trouvée. Veuillez d'abord remplir le formulaire.";
+        "Données du client introuvables. Veuillez d'abord remplir le formulaire.";
       this.showDataModal = true;
       this.cdr.markForCheck();
       return;
     }
-
     const email = this.userData.email?.toString().trim();
     if (!email) {
       this.paymentError =
-        "E-Mail requise. Veuillez d'abord remplir le formulaire.";
+        'Adresse e-mail requise. Veuillez remplir le formulaire.';
       this.showDataModal = true;
       this.cdr.markForCheck();
       return;
     }
 
-    // Guardar mensaje pendiente si existe
+    // Sauvegarder le message en attente s'il existe
     if (this.currentMessage) {
       sessionStorage.setItem('pendingHoroscopeMessage', this.currentMessage);
     }
   }
 
-  // ✅ MÉTODO MIGRADO A PAYPAL
+  // ✅ MÉTHODE MIGRÉE VERS PAYPAL
   async handleHoroscopePaymentSubmit(): Promise<void> {
     this.isProcessingPayment = true;
     this.paymentError = null;
     this.cdr.markForCheck();
 
     try {
-      // Iniciar el flujo de pago de PayPal (redirige al usuario)
+      // Démarrer le flux de paiement PayPal (redirige l'utilisateur)
       await this.paypalService.initiatePayment({
         amount: '4.00',
         currency: 'EUR',
@@ -437,17 +456,17 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
         cancelPath: '/horoscope',
       });
 
-      // El código después de esta línea NO se ejecutará porque
-      // el usuario será redirigido a PayPal
+      // Le code après cette ligne NE sera PAS exécuté car
+      // l'utilisateur sera redirigé vers PayPal
     } catch (error: any) {
       this.paymentError =
-        error.message || "Erreur lors de l'initialisation du paiement PayPal.";
+        error.message || 'Erreur lors du démarrage du paiement PayPal.';
       this.isProcessingPayment = false;
       this.cdr.markForCheck();
     }
   }
 
-  // ✅ MÉTODO SIMPLIFICADO - PayPal no requiere cleanup
+  // ✅ MÉTHODE SIMPLIFIÉE - PayPal ne nécessite pas de cleanup
   cancelHoroscopePayment(): void {
     this.showPaymentModal = false;
     this.isProcessingPayment = false;
@@ -459,26 +478,26 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     this.showDataForm = false;
   }
 
-  // Cargar información del maestro
+  // Charger les informations du maître
   loadMasterInfo(): void {
     this.zodiacoChinoService.getMasterInfo().subscribe({
       next: (info) => {
         this.masterInfo = info;
       },
       error: (error) => {
-        // Información predeterminada en caso de error
+        // Informations par défaut en cas d'erreur
         this.masterInfo = {
           success: true,
           master: {
-            name: 'Astrologue María',
-            title: 'Guide céleste des signes',
-            specialty: 'Astrologie occidentale et horoscope personnalisé',
+            name: 'Astrologue Marie',
+            title: 'Guide Céleste des Signes',
+            specialty: 'Astrologie Occidentale et Horoscope Personnalisé',
             description:
-              "Astrologue sage, spécialisée dans l'interprétation des influences célestes et de la sagesse des douze signes du zodiaque",
+              "Astrologue sage, spécialisée dans l'interprétation des influences célestes et la sagesse des douze signes du zodiaque",
             services: [
               'Interprétation des signes du zodiaque',
-              'Analyse des cartes astrales',
-              "Prévisions d'horoscope",
+              'Analyse des thèmes astraux',
+              "Prédictions d'horoscope",
               'Compatibilité entre signes',
               "Conseils basés sur l'astrologie",
             ],
@@ -489,34 +508,28 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     });
   }
 
-  // Iniciar consulta del horóscopo
+  // Démarrer la consultation de l'horoscope
   startConsultation(): void {
     if (this.userForm.valid && !this.isLoading) {
       this.isLoading = true;
-      this.cdr.markForCheck(); // ✅ Detectar cambio de loading
+      this.cdr.markForCheck(); // ✅ Détecter le changement de loading
 
       const formData = this.userForm.value;
 
-      // Calcular animal del zodiaco
+      // Calculer l'animal du zodiaque
 
       const initialMessage =
         formData.initialQuestion ||
         "Bonjour ! J'aimerais en savoir plus sur mon signe du zodiaque et mon horoscope.";
 
-      // Agregar mensaje del usuario
+      // Ajouter le message de l'utilisateur
       this.addMessage('user', initialMessage);
 
-      // Marcar que se hizo la primera pregunta
-      if (!this.firstQuestionAsked) {
-        this.firstQuestionAsked = true;
-        sessionStorage.setItem('horoscopeFirstQuestionAsked', 'true');
-      }
-
-      // Preparar datos para enviar al backend
+      // Préparer les données à envoyer au backend
       const consultationData = {
         zodiacData: {
-          name: 'Astrologue María',
-          specialty: 'Astrologie occidentale et horoscope personnalisé',
+          name: 'Astrologue Marie',
+          specialty: 'Astrologie Occidentale et Horoscope Personnalisé',
           experience:
             "Des décennies d'expérience en interprétation astrologique",
         },
@@ -527,82 +540,121 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
         conversationHistory: this.conversationHistory,
       };
 
-      // Llamar al servicio
-      this.zodiacoChinoService.chatWithMaster(consultationData).subscribe({
-        next: (response) => {
-          this.isLoading = false;
-          if (response.success && response.response) {
-            this.addMessage('master', response.response);
-            this.isFormCompleted = true;
-            this.showDataForm = false;
-            this.saveHoroscopeMessagesToSession();
+      // ✅ Appeler le service avec compteur de messages (message initial = 1)
+      this.zodiacoChinoService
+        .chatWithMasterWithCount(
+          consultationData,
+          1,
+          this.hasUserPaidForHoroscope
+        )
+        .subscribe({
+          next: (response) => {
+            this.isLoading = false;
+            if (response.success && response.response) {
+              this.addMessage('master', response.response);
+              this.isFormCompleted = true;
+              this.showDataForm = false;
+              this.saveHoroscopeMessagesToSession();
+              this.cdr.markForCheck();
+            } else {
+              this.handleError("Erreur dans la réponse de l'astrologue");
+            }
+          },
+          error: (error) => {
+            this.isLoading = false;
+            this.handleError(
+              "Erreur de connexion avec l'astrologue : " +
+                (error.error?.error || error.message)
+            );
             this.cdr.markForCheck();
-          } else {
-            this.handleError("Erreur dans la réponse de l'astrologue");
-          }
-        },
-        error: (error) => {
-          this.isLoading = false;
-          this.handleError(
-            "Erreur de connexion avec l'astrologue : " +
-              (error.error?.error || error.message)
-          );
-          this.cdr.markForCheck();
-        },
-      });
+          },
+        });
     }
+  }
+
+  // ✅ NOUVEAU : Obtenir les messages gratuits restants
+  getFreeMessagesRemaining(): number {
+    if (this.hasUserPaidForHoroscope) {
+      return -1; // Illimité
+    }
+    return Math.max(0, this.FREE_MESSAGES_LIMIT - this.userMessageCount);
   }
 
   sendMessage(): void {
     if (this.currentMessage.trim() && !this.isLoading) {
       const message = this.currentMessage.trim();
 
-      // ✅ LÓGICA ACTUALIZADA: Verificar acceso premium O consultas gratuitas
-      if (!this.hasUserPaidForHoroscope && this.firstQuestionAsked) {
-        // Verificar si tiene consultas horoscópicas gratis disponibles
-        if (this.hasFreeHoroscopeConsultationsAvailable()) {
-          this.useFreeHoroscopeConsultation();
-          // Continuar con el mensaje sin bloquear
-        } else {
-          // Si no tiene consultas gratis NI acceso premium, mostrar modal de datos
+      // Calculer le prochain numéro de message
+      const nextMessageCount = this.userMessageCount + 1;
 
-          // Cerrar otros modales primero
-          this.showFortuneWheel = false;
-          this.showPaymentModal = false;
+      console.log(
+        `📊 Horoscope - Message #${nextMessageCount}, Premium : ${this.hasUserPaidForHoroscope}, Limite : ${this.FREE_MESSAGES_LIMIT}`
+      );
 
-          // Guardar el mensaje para procesarlo después del pago
-          sessionStorage.setItem('pendingHoroscopeMessage', message);
+      // ✅ Vérifier l'accès
+      const canSendMessage =
+        this.hasUserPaidForHoroscope ||
+        this.hasFreeHoroscopeConsultationsAvailable() ||
+        nextMessageCount <= this.FREE_MESSAGES_LIMIT;
 
-          this.saveHoroscopeStateBeforePayment();
+      if (!canSendMessage) {
+        console.log('❌ Sans accès - affichage du modal de paiement');
 
-          // Mostrar modal de datos con timeout
-          setTimeout(() => {
-            this.showDataModal = true;
-            this.cdr.markForCheck();
-          }, 100);
+        // Fermer les autres modals
+        this.showFortuneWheel = false;
+        this.showPaymentModal = false;
 
-          return; // Salir aquí para no procesar el mensaje aún
-        }
+        // Sauvegarder le message en attente
+        sessionStorage.setItem('pendingHoroscopeMessage', message);
+        this.saveHoroscopeStateBeforePayment();
+
+        // Afficher le modal de données
+        setTimeout(() => {
+          this.showDataModal = true;
+          this.cdr.markForCheck();
+        }, 100);
+
+        return;
       }
 
-      // Procesar mensaje normalmente
-      this.processHoroscopeUserMessage(message);
+      // ✅ Si utilisation d'une consultation gratuite de la roulette (après les 3 gratuites)
+      if (
+        !this.hasUserPaidForHoroscope &&
+        nextMessageCount > this.FREE_MESSAGES_LIMIT &&
+        this.hasFreeHoroscopeConsultationsAvailable()
+      ) {
+        this.useFreeHoroscopeConsultation();
+      }
+
+      // Traiter le message normalement
+      this.processHoroscopeUserMessage(message, nextMessageCount);
     }
   }
-  private processHoroscopeUserMessage(message: string): void {
+
+  private processHoroscopeUserMessage(
+    message: string,
+    messageCount: number
+  ): void {
     this.currentMessage = '';
     this.isLoading = true;
     this.isTyping = true;
-    this.cdr.markForCheck(); // ✅ Detectar cambios de estado
+    this.cdr.markForCheck(); // ✅ Détecter les changements d'état
 
-    // Agregar mensaje del usuario
+    // Ajouter le message de l'utilisateur
     this.addMessage('user', message);
+
+    // ✅ Mettre à jour le compteur
+    this.userMessageCount = messageCount;
+    sessionStorage.setItem(
+      'horoscopeUserMessageCount',
+      this.userMessageCount.toString()
+    );
 
     const formData = this.userForm.value;
     const consultationData = {
       zodiacData: {
-        name: 'Astrologue María',
-        specialty: 'Astrologie occidentale et horoscope personnalisé',
+        name: 'Astrologue Marie',
+        specialty: 'Astrologie Occidentale et Horoscope Personnalisé',
         experience: "Des décennies d'expérience en interprétation astrologique",
       },
       userMessage: message,
@@ -612,63 +664,68 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
       conversationHistory: this.conversationHistory,
     };
 
-    this.zodiacoChinoService.chatWithMaster(consultationData).subscribe({
-      next: (response) => {
-        this.isLoading = false;
-        this.isTyping = false;
-        this.cdr.markForCheck(); // ✅ Detectar fin de loading
+    // ✅ Appeler le service avec compteur de messages
+    this.zodiacoChinoService
+      .chatWithMasterWithCount(
+        consultationData,
+        messageCount,
+        this.hasUserPaidForHoroscope
+      )
+      .subscribe({
+        next: (response) => {
+          this.isLoading = false;
+          this.isTyping = false;
+          this.cdr.markForCheck(); // ✅ Détecter la fin du loading
 
-        if (response.success && response.response) {
-          const messageId = Date.now().toString();
+          if (response.success && response.response) {
+            const messageId = Date.now().toString();
 
-          this.addMessage('master', response.response, messageId);
+            this.addMessage('master', response.response, messageId);
 
-          // ✅ LÓGICA ACTUALIZADA: Solo bloquear si NO tiene acceso premium Y no tiene consultas gratis
-          if (
-            this.firstQuestionAsked &&
-            !this.hasUserPaidForHoroscope && // No tiene acceso premium
-            !this.hasFreeHoroscopeConsultationsAvailable() // No tiene consultas gratis
-          ) {
-            this.blockedMessageId = messageId;
-            sessionStorage.setItem('horoscopeBlockedMessageId', messageId);
+            // ✅ Afficher le paywall si la limite gratuite est dépassée ET pas de consultations de roulette
+            const shouldShowPaywall =
+              !this.hasUserPaidForHoroscope &&
+              messageCount > this.FREE_MESSAGES_LIMIT &&
+              !this.hasFreeHoroscopeConsultationsAvailable();
 
-            setTimeout(() => {
-              this.saveHoroscopeStateBeforePayment();
+            if (shouldShowPaywall) {
+              this.blockedMessageId = messageId;
+              sessionStorage.setItem('horoscopeBlockedMessageId', messageId);
 
-              // Cerrar otros modales
-              this.showFortuneWheel = false;
-              this.showPaymentModal = false;
-
-              // Mostrar modal de datos
               setTimeout(() => {
-                this.showDataModal = true;
-                this.cdr.markForCheck();
-              }, 100);
-            }, 2000);
-          } else if (!this.firstQuestionAsked) {
-            this.firstQuestionAsked = true;
-            sessionStorage.setItem('horoscopeFirstQuestionAsked', 'true');
-          }
+                this.saveHoroscopeStateBeforePayment();
 
-          this.saveHoroscopeMessagesToSession();
+                // Fermer les autres modals
+                this.showFortuneWheel = false;
+                this.showPaymentModal = false;
+
+                // Afficher le modal de données
+                setTimeout(() => {
+                  this.showDataModal = true;
+                  this.cdr.markForCheck();
+                }, 100);
+              }, 2000);
+            }
+
+            this.saveHoroscopeMessagesToSession();
+            this.cdr.markForCheck();
+          } else {
+            this.handleError("Erreur dans la réponse de l'astrologue");
+          }
+        },
+        error: (error) => {
+          this.isLoading = false;
+          this.isTyping = false;
+          this.handleError(
+            "Erreur de connexion avec l'astrologue : " +
+              (error.error?.error || error.message)
+          );
           this.cdr.markForCheck();
-        } else {
-          this.handleError("Erreur dans la réponse de l'astrologue");
-        }
-      },
-      error: (error) => {
-        this.isLoading = false;
-        this.isTyping = false;
-        this.handleError(
-          "Erreur de connexion avec l'astrologue : " +
-            (error.error?.error || error.message)
-        );
-        this.cdr.markForCheck();
-      },
-    });
+        },
+      });
   }
 
-  // Manejar tecla Enter
+  // Gérer la touche Entrée
   onEnterKey(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -676,28 +733,29 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     }
   }
 
-  // Alternar formulario
+  // Basculer le formulaire
   toggleDataForm(): void {
     this.showDataForm = !this.showDataForm;
   }
 
-  // Reiniciar consulta
+  // Réinitialiser la consultation
   resetConsultation(): void {
     this.conversationHistory = [];
     this.isFormCompleted = false;
     this.showDataForm = true;
     this.currentMessage = '';
     this.zodiacAnimal = {};
-    this.firstQuestionAsked = false;
     this.blockedMessageId = null;
 
-    // Limpiar sessionStorage específico del horóscopo
+    // ✅ Réinitialiser le compteur
     if (!this.hasUserPaidForHoroscope) {
+      this.userMessageCount = 0;
       this.clearHoroscopeSessionData();
     } else {
       sessionStorage.removeItem('horoscopeMessages');
-      sessionStorage.removeItem('horoscopeFirstQuestionAsked');
       sessionStorage.removeItem('horoscopeBlockedMessageId');
+      sessionStorage.removeItem('horoscopeUserMessageCount');
+      this.userMessageCount = 0;
     }
 
     this.userForm.reset({
@@ -710,22 +768,23 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     this.initializeHoroscopeWelcomeMessage();
   }
 
-  // Explorar compatibilidad
+  // Explorer la compatibilité
   exploreCompatibility(): void {
     const message =
-      "Pouvez-vous me parler de la compatibilité de mon signe avec d'autres signes ?";
+      "Pourriez-vous parler de la compatibilité de mon signe du zodiaque avec d'autres signes ?";
     this.currentMessage = message;
     this.sendMessage();
   }
 
-  // Explorar elementos
+  // Explorer les éléments
   exploreElements(): void {
     const message =
-      'Comment les planètes influencent-elles ma personnalité et mon destin?';
+      'Comment les planètes influencent-elles ma personnalité et mon destin ?';
     this.currentMessage = message;
     this.sendMessage();
   }
-  // Métodos auxiliares
+
+  // Méthodes auxiliaires
   private addMessage(
     role: 'user' | 'master',
     message: string,
@@ -740,7 +799,7 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     this.conversationHistory.push(newMessage);
     this.shouldScrollToBottom = true;
     this.saveHoroscopeMessagesToSession();
-    this.cdr.markForCheck(); // ✅ CRÍTICO: Detectar cambios en mensajes
+    this.cdr.markForCheck(); // ✅ CRITIQUE : Détecter les changements dans les messages
   }
 
   private scrollToBottom(): void {
@@ -753,10 +812,7 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
   }
 
   private handleError(message: string): void {
-    this.addMessage(
-      'master',
-      `Je suis désolé(e), ${message}. Veuillez réessayer.`
-    );
+    this.addMessage('master', `Désolé, ${message}. Veuillez réessayer.`);
   }
 
   formatMessage(content: string): string {
@@ -764,16 +820,16 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
 
     let formattedContent = content;
 
-    // Convertir **texto** a <strong>texto</strong> para negrilla
+    // Convertir **texte** en <strong>texte</strong> pour le gras
     formattedContent = formattedContent.replace(
       /\*\*(.*?)\*\*/g,
       '<strong>$1</strong>'
     );
 
-    // Convertir saltos de línea a <br> para mejor visualización
+    // Convertir les sauts de ligne en <br> pour une meilleure visualisation
     formattedContent = formattedContent.replace(/\n/g, '<br>');
 
-    // Opcional: También puedes manejar *texto* (una sola asterisco) como cursiva
+    // Optionnel : Gérer également *texte* (un seul astérisque) comme italique
     formattedContent = formattedContent.replace(
       /(?<!\*)\*([^*\n]+)\*(?!\*)/g,
       '<em>$1</em>'
@@ -785,7 +841,7 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
   formatTime(timestamp?: string): string {
     if (!timestamp) return '';
     const date = new Date(timestamp);
-    return date.toLocaleTimeString('de-DE', {
+    return date.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -795,14 +851,14 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     return `${message.role}-${message.timestamp}-${index}`;
   }
 
-  // Auto-resize del textarea
+  // Auto-resize du textarea
   autoResize(event: any): void {
     const textarea = event.target;
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   }
 
-  // Manejar tecla Enter
+  // Gérer la touche Entrée
   onKeyPress(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -810,119 +866,139 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
     }
   }
 
-  // Limpiar chat
+  // Effacer le chat
   clearChat(): void {
     this.conversationHistory = [];
     this.currentMessage = '';
-    this.firstQuestionAsked = false;
     this.blockedMessageId = null;
     this.isLoading = false;
 
-    // Limpiar sessionStorage específico del horóscopo (pero NO userData)
-    sessionStorage.removeItem('horoscopeMessages');
-    sessionStorage.removeItem('horoscopeFirstQuestionAsked');
-    sessionStorage.removeItem('horoscopeBlockedMessageId');
+    // ✅ Réinitialiser le compteur
+    if (!this.hasUserPaidForHoroscope) {
+      this.userMessageCount = 0;
+      sessionStorage.removeItem('horoscopeMessages');
+      sessionStorage.removeItem('horoscopeBlockedMessageId');
+      sessionStorage.removeItem('horoscopeUserMessageCount');
+      sessionStorage.removeItem('freeHoroscopeConsultations');
+      sessionStorage.removeItem('pendingHoroscopeMessage');
+    } else {
+      sessionStorage.removeItem('horoscopeMessages');
+      sessionStorage.removeItem('horoscopeBlockedMessageId');
+      sessionStorage.removeItem('horoscopeUserMessageCount');
+      this.userMessageCount = 0;
+    }
 
     this.shouldScrollToBottom = true;
     this.initializeHoroscopeWelcomeMessage();
   }
+
   resetChat(): void {
-    // 1. Reset de arrays y mensajes
+    // 1. Reset des arrays et messages
     this.conversationHistory = [];
     this.currentMessage = '';
 
-    // 2. Reset de estados de carga y typing
+    // 2. Reset des états de chargement et typing
     this.isLoading = false;
     this.isTyping = false;
 
-    // 3. Reset de estados de formulario
+    // 3. Reset des états de formulaire
     this.isFormCompleted = false;
     this.showDataForm = true;
 
-    // 4. Reset de estados de pago y bloqueo
-    this.firstQuestionAsked = false;
+    // 4. Reset des états de paiement et blocage
     this.blockedMessageId = null;
 
-    // 5. Reset de modales
+    // 5. Reset des modals
     this.showPaymentModal = false;
     this.showDataModal = false;
     this.showFortuneWheel = false;
 
-    // 6. Reset de variables de scroll y contadores
+    // 6. Reset des variables de scroll et compteurs
     this.shouldScrollToBottom = false;
     this.shouldAutoScroll = true;
-    this.lastMessageCount = 0; // ← Esta era tu variable contador
+    this.lastMessageCount = 0;
 
-    // 7. Reset del zodiac animal
+    // 7. Reset du zodiac animal
     this.zodiacAnimal = {};
 
-    // 8. ✅ PayPal no requiere cleanup de elementos
+    // 8. ✅ PayPal ne nécessite pas de cleanup d'éléments
     this.isProcessingPayment = false;
     this.paymentError = null;
 
-    // 9. Limpiar timers
+    // 9. Nettoyer les timers
     if (this.wheelTimer) {
       clearTimeout(this.wheelTimer);
     }
 
-    // 10. Limpiar sessionStorage específico del horóscopo (pero NO userData)
-    sessionStorage.removeItem('horoscopeMessages');
-    sessionStorage.removeItem('horoscopeFirstQuestionAsked');
-    sessionStorage.removeItem('horoscopeBlockedMessageId');
-    sessionStorage.removeItem('pendingHoroscopeMessage');
-    // NO limpiar 'userData' ni 'hasUserPaidForHoroscope'
+    // 10. ✅ Réinitialiser le compteur et nettoyer sessionStorage
+    if (!this.hasUserPaidForHoroscope) {
+      this.userMessageCount = 0;
+      sessionStorage.removeItem('horoscopeMessages');
+      sessionStorage.removeItem('horoscopeBlockedMessageId');
+      sessionStorage.removeItem('horoscopeUserMessageCount');
+      sessionStorage.removeItem('freeHoroscopeConsultations');
+      sessionStorage.removeItem('pendingHoroscopeMessage');
+    } else {
+      sessionStorage.removeItem('horoscopeMessages');
+      sessionStorage.removeItem('horoscopeBlockedMessageId');
+      sessionStorage.removeItem('horoscopeUserMessageCount');
+      this.userMessageCount = 0;
+    }
+    // NE PAS nettoyer 'userData' ni 'hasUserPaidForHoroscope'
 
-    // 11. Reset del formulario
+    // 11. Reset du formulaire
     this.userForm.reset({
       fullName: '',
       birthYear: '',
       birthDate: '',
       initialQuestion:
-        'Que pouvez-vous me dire sur mon signe du zodiaque et mon horoscope?',
+        'Que pouvez-vous me dire sur mon signe du zodiaque et mon horoscope ?',
     });
 
-    // 12. Reinicializar mensaje de bienvenida
+    // 12. Réinitialiser le message de bienvenue
     this.initializeHoroscopeWelcomeMessage();
     this.cdr.markForCheck();
   }
+
   onUserDataSubmitted(userData: any): void {
-    // ✅ VALIDAR CAMPOS CRÍTICOS ANTES DE PROCEDER
-    const requiredFields = ['email']; // ❌ QUITADO 'apellido' - ahora está unificado con nombre
+    // ✅ VALIDER LES CHAMPS CRITIQUES AVANT DE PROCÉDER
+    const requiredFields = ['email'];
     const missingFields = requiredFields.filter(
       (field) => !userData[field] || userData[field].toString().trim() === ''
     );
 
     if (missingFields.length > 0) {
       alert(
-        `Pour continuer, veuillez remplir les champs suivants : ${missingFields.join(
+        `Pour continuer, vous devez compléter les champs suivants : ${missingFields.join(
           ', '
         )}`
       );
-      this.showDataModal = true; // Mantener modal abierto
+      this.showDataModal = true; // Garder le modal ouvert
       this.cdr.markForCheck();
       return;
     }
 
-    // ✅ LIMPIAR Y GUARDAR datos INMEDIATAMENTE en memoria Y sessionStorage
+    // ✅ NETTOYER ET SAUVEGARDER les données IMMÉDIATEMENT en mémoire ET sessionStorage
     this.userData = {
       ...userData,
       email: userData.email?.toString().trim(),
     };
 
-    // ✅ GUARDAR EN sessionStorage INMEDIATAMENTE
+    // ✅ SAUVEGARDER dans sessionStorage IMMÉDIATEMENT
     try {
       sessionStorage.setItem('userData', JSON.stringify(this.userData));
 
-      // Verificar que se guardaron correctamente
-      const verificacion = sessionStorage.getItem('userData');
+      // Vérifier que les données ont été correctement sauvegardées
+      const verification = sessionStorage.getItem('userData');
     } catch (error) {}
 
     this.showDataModal = false;
     this.cdr.markForCheck();
 
-    // ✅ NUEVO: Enviar datos al backend como en otros componentes
+    // ✅ NOUVEAU : Envoyer les données au backend comme dans les autres composants
     this.sendUserDataToBackend(userData);
   }
+
   private sendUserDataToBackend(userData: any): void {
     this.http.post(`${this.backendUrl}api/recolecta`, userData).subscribe({
       next: (response) => {
@@ -933,10 +1009,12 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
       },
     });
   }
+
   onDataModalClosed(): void {
     this.showDataModal = false;
     this.cdr.markForCheck();
   }
+
   showHoroscopeWheelAfterDelay(delayMs: number = 3000): void {
     if (this.wheelTimer) {
       clearTimeout(this.wheelTimer);
@@ -949,7 +1027,7 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
         !this.showDataModal
       ) {
         this.showFortuneWheel = true;
-        this.cdr.markForCheck(); // ✅ Forzar detección de cambios
+        this.cdr.markForCheck(); // ✅ Forcer la détection des changements
       } else {
       }
     }, delayMs);
@@ -958,7 +1036,7 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
   onPrizeWon(prize: Prize): void {
     const prizeMessage: ChatMessage = {
       role: 'master',
-      message: `🔮 Les étoiles se sont alliées en votre faveur ! Vous avez gagné : **${prize.name}** ${prize.icon}\n\nLes forces célestes ont décidé de vous bénir avec ce cadeau sacré. L'énergie du zodiaque circule à travers vous, révélant des secrets plus profonds de votre horoscope personnel. Que la sagesse astrologique vous éclaire !`,
+      message: `🔮 Les étoiles ont conspiré en votre faveur ! Vous avez gagné : **${prize.name}** ${prize.icon}\n\nLes forces célestes ont décidé de vous bénir avec ce cadeau sacré. L'énergie du signe du zodiaque coule à travers vous, révélant des secrets plus profonds de votre horoscope personnel. Que la sagesse astrologique vous illumine !`,
       timestamp: new Date().toISOString(),
     };
 
@@ -980,10 +1058,10 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
 
     if (FortuneWheelComponent.canShowWheel()) {
       this.showFortuneWheel = true;
-      this.cdr.markForCheck(); // ✅ Forzar detección de cambios
+      this.cdr.markForCheck(); // ✅ Forcer la détection des changements
     } else {
       alert(
-        "Vous n'avez plus de tours disponibles. " +
+        "Vous n'avez plus de lancers disponibles. " +
           FortuneWheelComponent.getSpinStatus()
       );
     }
@@ -995,32 +1073,31 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
 
   private processHoroscopePrize(prize: Prize): void {
     switch (prize.id) {
-      case '1': // 3 Lecturas Horoscópicas
+      case '1': // 3 Lectures Horoscopiques
         this.addFreeHoroscopeConsultations(3);
         break;
-      case '2': // 1 Análisis Premium - ACCESO COMPLETO
+      case '2': // 1 Analyse Premium - ACCÈS COMPLET
         this.hasUserPaidForHoroscope = true;
         sessionStorage.setItem('hasUserPaidForHoroscope', 'true');
 
-        // Desbloquear cualquier mensaje bloqueado
+        // Débloquer tout message bloqué
         if (this.blockedMessageId) {
           this.blockedMessageId = null;
           sessionStorage.removeItem('horoscopeBlockedMessageId');
         }
 
-        // Agregar mensaje especial para este premio
+        // Ajouter un message spécial pour ce prix
         const premiumMessage: ChatMessage = {
           role: 'master',
           message:
-            "🌟 **Vous avez débloqué l'accès Premium complet !** 🌟\n\nLes étoiles ont exceptionnellement souri sur vous. Vous avez maintenant un accès illimité à toute ma sagesse astrologique. Vous pouvez consulter autant de fois que vous le souhaitez sur votre horoscope, la compatibilité, les prévisions et tous les secrets célestes.\n\n✨ *L'univers a ouvert toutes ses portes pour vous* ✨",
+            "🌟 **Vous avez débloqué l'accès premium complet !** 🌟\n\nLes étoiles vous ont souri exceptionnellement. Vous avez maintenant un accès illimité à toute ma sagesse astrologique. Vous pouvez consulter votre horoscope, la compatibilité, les prédictions et tous les secrets célestes autant de fois que vous le souhaitez.\n\n✨ *L'univers a ouvert toutes les portes pour vous* ✨",
           timestamp: new Date().toISOString(),
         };
         this.conversationHistory.push(premiumMessage);
         this.shouldScrollToBottom = true;
         this.saveHoroscopeMessagesToSession();
         break;
-      // ✅ ELIMINADO: case '3' - 2 Consultas Extra
-      case '4': // Otra oportunidad
+      case '4': // Autre opportunité
         break;
       default:
     }
@@ -1071,10 +1148,10 @@ Les douze signes (Bélier, Taureau, Gémeaux, Cancer, Lion, Vierge, Balance, Sco
 
   debugHoroscopeWheel(): void {
     this.showFortuneWheel = true;
-    this.cdr.markForCheck(); // ✅ Forzar detección de cambios
+    this.cdr.markForCheck(); // ✅ Forcer la détection des changements
   }
 
-  // ✅ MÉTODO AUXILIAR para el template
+  // ✅ MÉTHODE AUXILIAIRE pour le template
   getHoroscopeConsultationsCount(): number {
     return parseInt(
       sessionStorage.getItem('freeHoroscopeConsultations') || '0'

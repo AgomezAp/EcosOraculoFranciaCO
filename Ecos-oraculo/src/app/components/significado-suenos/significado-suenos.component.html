@@ -45,34 +45,34 @@
     ></noscript>
     <!-- End Google Tag Manager (noscript) -->
     <div class="oracle-container">
-      <!-- Video de fondo -->
+      <!-- Vidéo de fond -->
       <video autoplay muted loop playsinline class="background-video">
         <source src="/SUENOS.mp4" type="video/mp4" />
         Votre navigateur ne prend pas en charge les vidéos HTML5.
       </video>
 
-      <!-- Overlay opcional para mejorar legibilidad -->
+      <!-- Overlay optionnel pour améliorer la lisibilité -->
       <div class="video-overlay"></div>
 
       <div class="content-with-navbar">
         <div class="oracle-main">
-          <!-- Información del intérprete -->
+          <!-- Informations de l'interprète -->
           <div class="interpreter-info">
             <div class="interpreter-avatar">
               <img
                 class="mystical-orb-image"
                 src="/Maestra1.webp"
-                alt="Avatar de la Maîtresse"
+                alt="Avatar Maître"
               />
             </div>
             <div class="interpreter-details">
-              <!-- Primera línea: nombre + icono + título juntos -->
+              <!-- Première ligne : nom + icône + titre ensemble -->
               <div class="name-title-row">
                 <h3>{{ interpreterData.name }}</h3>
                 <span class="separator-icon">»</span>
                 <p class="interpreter-title">Gardien des Rêves</p>
               </div>
-              <!-- Segunda línea: especialidad debajo EN MAYÚSCULAS -->
+              <!-- Deuxième ligne : spécialité en dessous EN MAJUSCULES -->
               <p class="interpreter-specialty">
                 {{ interpreterData.specialty }}
               </p>
@@ -98,7 +98,7 @@
             </button>
           </div>
 
-          <!-- Área de conversación -->
+          <!-- Zone de conversation -->
           <div class="chat-area">
             <div
               class="messages-container"
@@ -123,18 +123,18 @@
                     *ngIf="message.role === 'interpreter'"
                     class="interpreter-avatar-small"
                     src="/Maestra1.webp"
-                    alt="Avatar de la Maîtresse"
+                    alt="Avatar Maître"
                   />
                 </div>
 
                 <div class="message-content">
                   <div class="message-bubble">
-                    <!-- CONTENIDO ORIGINAL (se difumina si está bloqueado) -->
+                    <!-- CONTENU ORIGINAL (devient flou si bloqué) -->
                     <div [class.blurred-content]="isMessageBlocked(message)">
                       <p [innerHTML]="formatMessage(message.message)"></p>
                     </div>
 
-                    <!-- OVERLAY DE PAGO (solo aparece si está bloqueado) -->
+                    <!-- OVERLAY DE PAIEMENT (apparaît uniquement si bloqué) -->
                     <div
                       *ngIf="isMessageBlocked(message)"
                       class="message-payment-overlay"
@@ -143,14 +143,14 @@
                         <span class="lock-icon">🔒</span>
                         <p><strong>Contenu Premium</strong></p>
                         <p>
-                          Paie 4.00€ pour voir cette interprétation et accéder à
-                          des interprétations illimitées
+                          Payez 4,00€ pour voir cette interprétation et accéder
+                          à des interprétations illimitées
                         </p>
                         <button
                           (click)="promptForPayment()"
                           class="unlock-button"
                         >
-                          💳 Débloquer pour 4.00€
+                          💳 Débloquer pour 4,00€
                         </button>
                       </div>
                     </div>
@@ -162,7 +162,7 @@
                 </div>
               </div>
 
-              <!-- Indicador de escritura (SIN CAMBIOS) -->
+              <!-- Indicateur de frappe (SANS CHANGEMENT) -->
               <div
                 *ngIf="isTyping"
                 class="message interpreter-message typing-indicator"
@@ -172,7 +172,7 @@
                     <img
                       class="interpreter-avatar-small"
                       src="/Maestra1.webp"
-                      alt="Avatar de la Maîtresse"
+                      alt="Avatar Maître"
                   /></span>
                 </div>
                 <div class="message-content">
@@ -183,7 +183,7 @@
                       <span></span>
                     </div>
                     <p class="typing-text">
-                      Maestra alma interprète les énergies...
+                      Maître Alma interprète les énergies...
                     </p>
                   </div>
                 </div>
@@ -197,7 +197,7 @@
                   #messageTextarea
                   class="message-input"
                   [(ngModel)]="messageText"
-                  placeholder="Décris ton rêve en détail..."
+                  placeholder="Décrivez votre rêve en détail..."
                   maxlength="1500"
                   (keydown)="onKeyPress($event)"
                   (input)="adjustTextareaHeight($event)"
@@ -245,7 +245,7 @@
       <div *ngIf="showPaymentModal" class="payment-modal-overlay">
         <div class="payment-modal">
           <div class="payment-header">
-            <h3>🔮 Débloque les Interprétations Illimitées</h3>
+            <h3>🔮 Débloquez les Interprétations Illimitées</h3>
             <button (click)="cancelPayment()" class="close-payment-button">
               ✕
             </button>
@@ -260,7 +260,7 @@
             </div>
 
             <div class="payment-price">
-              <span class="price-amount">4.00€</span>
+              <span class="price-amount">4,00€</span>
               <span class="price-description"
                 >Accès complet aux interprétations</span
               >
@@ -271,13 +271,13 @@
               <p>Préparation du système de paiement...</p>
             </div>
 
-            <!-- ✅ CAMBIO CRÍTICO: Usar [hidden] en lugar de *ngIf -->
+            <!-- ✅ CHANGEMENT CRITIQUE : Utiliser [hidden] au lieu de *ngIf -->
             <div
               id="payment-element-container"
               class="payment-element-container"
               [hidden]="isProcessingPayment"
             >
-              <!-- Stripe Payment Element se monta aquí -->
+              <!-- Stripe Payment Element se monte ici -->
             </div>
 
             <div *ngIf="paymentError" class="payment-error">
@@ -291,19 +291,12 @@
                 class="pay-button"
               >
                 <span *ngIf="!isProcessingPayment">💳 Payer et Continuer</span>
-                <span *ngIf="isProcessingPayment">Traitement...</span>
+                <span *ngIf="isProcessingPayment">Traitement en cours...</span>
               </button>
             </div>
           </div>
         </div>
       </div>
-      <app-fortune-wheel
-        [isVisible]="showFortuneWheel"
-        [prizes]="wheelPrizes"
-        (onPrizeWon)="onPrizeWon($event)"
-        (onWheelClosed)="onWheelClosed()"
-      >
-      </app-fortune-wheel>
     </div>
   </body>
 </html>

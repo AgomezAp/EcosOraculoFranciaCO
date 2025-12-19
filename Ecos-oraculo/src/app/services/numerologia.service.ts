@@ -2,13 +2,17 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { catchError, map, Observable, of, timeout } from 'rxjs';
 import { environment } from '../environments/environmets.prod';
+
+// ✅ Interface pour les données du numérologue
 interface NumerologyData {
   name: string;
+  title?: string;
   specialty: string;
   experience: string;
 }
 
-interface NumerologyRequest {
+// ✅ Interface du Request - EXPORTÉE
+export interface NumerologyRequest {
   numerologyData: NumerologyData;
   userMessage: string;
   birthDate?: string;
@@ -17,17 +21,25 @@ interface NumerologyRequest {
     role: 'user' | 'numerologist';
     message: string;
   }>;
+  messageCount?: number;
+  isPremiumUser?: boolean;
 }
 
-interface NumerologyResponse {
+// ✅ Interface du Response - EXPORTÉE
+export interface NumerologyResponse {
   success: boolean;
   response?: string;
   error?: string;
   code?: string;
   timestamp?: string;
+  freeMessagesRemaining?: number;
+  showPaywall?: boolean;
+  paywallMessage?: string;
+  isCompleteResponse?: boolean;
 }
 
-interface NumerologyInfo {
+// ✅ Interface pour les informations du numérologue - EXPORTÉE
+export interface NumerologyInfo {
   success: boolean;
   numerologist: {
     name: string;
@@ -36,167 +48,304 @@ interface NumerologyInfo {
     description: string;
     services: string[];
   };
+  freeMessagesLimit?: number;
   timestamp: string;
 }
+
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class NumerologiaService {
- private appUrl: string;
+  private appUrl: string;
   private apiUrl: string;
-  // Datos por defecto del numerólogo
+
+  // Données par défaut du numérologue
   private defaultNumerologyData: NumerologyData = {
-    name: "Maestra Sofía",
-    specialty: "Numerología pitagórica",
-    experience: "Décadas de experiencia"
+    name: 'Maîtresse Sophie',
+    title: 'Gardienne des Nombres Sacrés',
+    specialty: 'Numérologie pythagoricienne',
+    experience:
+      'Des décennies d\'expérience dans les vibrations numériques de l\'univers',
   };
 
   constructor(private http: HttpClient) {
     this.appUrl = environment.apiUrl;
     this.apiUrl = 'api/numerology';
-   }
+  }
 
-  // Método principal para enviar mensaje al numerólogo
-  sendMessage(
-    userMessage: string, 
-    birthDate?: string, 
-    fullName?: string, 
-    conversationHistory?: Array<{role: 'user' | 'numerologist', message: string}>
-  ): Observable<string> {
-    
+  /**
+   * ✅ MÉTHODE PRINCIPALE : Envoyer un message avec compteur de messages
+   */
+  sendMessageWithCount(
+    userMessage: string,
+    messageCount: number,
+    isPremiumUser: boolean,
+    birthDate?: string,
+    fullName?: string,
+    conversationHistory?: Array<{
+      role: 'user' | 'numerologist';
+      message: string;
+    }>
+  ): Observable<NumerologyResponse> {
     const request: NumerologyRequest = {
       numerologyData: this.defaultNumerologyData,
       userMessage: userMessage.trim(),
       birthDate,
       fullName,
-      conversationHistory
+      conversationHistory,
+      messageCount,
+      isPremiumUser,
     };
 
-    console.log('Enviando mensaje al numerólogo:', this.apiUrl + '/numerologist');
-    
-    return this.http.post<NumerologyResponse>(`${this.appUrl}${this.apiUrl}/numerologist`, request).pipe(
-      timeout(30000), // 30 segundos timeout
-      map((response:any) => {
-        console.log('Respuesta del numerólogo:', response);
-        if (response.success && response.response) {
-          return response.response;
-        }
-        throw new Error(response.error || 'Respuesta inválida del servidor');
-      }),
-      catchError((error: HttpErrorResponse) => {
-        console.error('Error en comunicación con numerólogo:', error);
-        return of(this.getErrorMessage(error));
-      })
-    );
+    console.log('📤 Envoi du message au numérologue :', {
+      messageCount: request.messageCount,
+      isPremiumUser: request.isPremiumUser,
+      userMessage: request.userMessage.substring(0, 50) + '...',
+    });
+
+    return this.http
+      .post<NumerologyResponse>(
+        `${this.appUrl}${this.apiUrl}/numerologist`,
+        request
+      )
+      .pipe(
+        timeout(60000),
+        map((response: NumerologyResponse) => {
+          console.log('📥 Réponse du numérologue :', {
+            success: response.success,
+            freeMessagesRemaining: response.freeMessagesRemaining,
+            showPaywall: response.showPaywall,
+            isCompleteResponse: response.isCompleteResponse,
+          });
+
+          if (response.success) {
+            return response;
+          }
+          throw new Error(response.error || 'Réponse invalide du serveur');
+        }),
+        catchError((error: HttpErrorResponse) => {
+          console.error('Erreur de communication avec le numérologue :', error);
+          return of({
+            success: false,
+            error: this.getErrorMessage(error),
+            timestamp: new Date().toISOString(),
+          } as NumerologyResponse);
+        })
+      );
   }
 
-  // Obtener información del numerólogo
+  /**
+   * Méthode legacy pour compatibilité
+   */
+  sendMessage(
+    userMessage: string,
+    birthDate?: string,
+    fullName?: string,
+    conversationHistory?: Array<{
+      role: 'user' | 'numerologist';
+      message: string;
+    }>
+  ): Observable<string> {
+    const request: NumerologyRequest = {
+      numerologyData: this.defaultNumerologyData,
+      userMessage: userMessage.trim(),
+      birthDate,
+      fullName,
+      conversationHistory,
+      messageCount: 1,
+      isPremiumUser: false,
+    };
+
+    console.log(
+      'Envoi du message au numérologue (legacy) :',
+      this.apiUrl + '/numerologist'
+    );
+
+    return this.http
+      .post<NumerologyResponse>(
+        `${this.appUrl}${this.apiUrl}/numerologist`,
+        request
+      )
+      .pipe(
+        timeout(30000),
+        map((response: NumerologyResponse) => {
+          console.log('Réponse du numérologue :', response);
+          if (response.success && response.response) {
+            return response.response;
+          }
+          throw new Error(response.error || 'Réponse invalide du serveur');
+        }),
+        catchError((error: HttpErrorResponse) => {
+          console.error('Erreur de communication avec le numérologue :', error);
+          return of(this.getErrorMessage(error));
+        })
+      );
+  }
+
+  /**
+   * Obtenir les informations du numérologue
+   */
   getNumerologyInfo(): Observable<NumerologyInfo> {
-    return this.http.get<NumerologyInfo>(`${this.appUrl}${this.apiUrl}/numerologist/info`).pipe(
-      timeout(10000),
-      catchError((error: HttpErrorResponse) => {
-        console.error('Error obteniendo info del numerólogo:', error);
-        return of({
-          success: false,
-          numerologist: {
-            name: "Maestra Sofía",
-            title: "Guardiana de los Números Sagrados",
-            specialty: "Numerología pitagórica",
-            description: "Error al conectar con el numerólogo",
-            services: []
-          },
-          timestamp: new Date().toISOString()
-        } as NumerologyInfo);
-      })
-    );
+    return this.http
+      .get<NumerologyInfo>(`${this.appUrl}${this.apiUrl}/numerologist/info`)
+      .pipe(
+        timeout(10000),
+        catchError((error: HttpErrorResponse) => {
+          console.error('Erreur lors de l\'obtention des infos du numérologue :', error);
+          return of({
+            success: false,
+            numerologist: {
+              name: 'Maîtresse Sophie',
+              title: 'Gardienne des Nombres Sacrés',
+              specialty: 'Numérologie pythagoricienne',
+              description: 'Erreur de connexion avec le numérologue',
+              services: [],
+            },
+            freeMessagesLimit: 3,
+            timestamp: new Date().toISOString(),
+          } as NumerologyInfo);
+        })
+      );
   }
 
-  // Probar conexión con el backend
+  /**
+   * Tester la connexion avec le backend
+   */
   testConnection(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/test`).pipe(
+    return this.http.get(`${this.appUrl}api/health`).pipe(
       timeout(5000),
       catchError((error: HttpErrorResponse) => {
-        console.error('Error de conexión:', error);
-        return of({ 
-          success: false, 
-          error: 'No se puede conectar con el servicio de numerología' 
+        console.error('Erreur de connexion :', error);
+        return of({
+          success: false,
+          error: 'Impossible de se connecter au service de numérologie',
         });
       })
     );
   }
 
-  // Calcular número del camino de vida (método auxiliar para el frontend)
+  /**
+   * Calculer le nombre du chemin de vie
+   */
   calculateLifePath(birthDate: string): number {
     try {
       const numbers = birthDate.replace(/\D/g, '');
-      const sum = numbers.split('').reduce((acc, digit) => acc + parseInt(digit), 0);
+      const sum = numbers
+        .split('')
+        .reduce((acc, digit) => acc + parseInt(digit), 0);
       return this.reduceToSingleDigit(sum);
     } catch {
       return 0;
     }
   }
 
-  // Calcular número del destino (método auxiliar para el frontend)
+  /**
+   * Calculer le nombre du destin basé sur le nom
+   */
   calculateDestinyNumber(name: string): number {
     const letterValues: { [key: string]: number } = {
-      A: 1, B: 2, C: 3, D: 4, E: 5, F: 6, G: 7, H: 8, I: 9,
-      J: 1, K: 2, L: 3, M: 4, N: 5, O: 6, P: 7, Q: 8, R: 9,
-      S: 1, T: 2, U: 3, V: 4, W: 5, X: 6, Y: 7, Z: 8
+      A: 1,
+      B: 2,
+      C: 3,
+      D: 4,
+      E: 5,
+      F: 6,
+      G: 7,
+      H: 8,
+      I: 9,
+      J: 1,
+      K: 2,
+      L: 3,
+      M: 4,
+      N: 5,
+      O: 6,
+      P: 7,
+      Q: 8,
+      R: 9,
+      S: 1,
+      T: 2,
+      U: 3,
+      V: 4,
+      W: 5,
+      X: 6,
+      Y: 7,
+      Z: 8,
     };
-    
-    const sum = name.toUpperCase().replace(/[^A-Z]/g, '').split('').reduce((acc, letter) => {
-      return acc + (letterValues[letter] || 0);
-    }, 0);
-    
+
+    const sum = name
+      .toUpperCase()
+      .replace(/[^A-Z]/g, '')
+      .split('')
+      .reduce((acc, letter) => {
+        return acc + (letterValues[letter] || 0);
+      }, 0);
+
     return this.reduceToSingleDigit(sum);
   }
 
-  // Obtener interpretación básica de un número
+  /**
+   * Obtenir l'interprétation de base d'un nombre
+   */
   getNumberMeaning(number: number): string {
     const meanings: { [key: number]: string } = {
-      1: "Liderazgo, independencia, pionero",
-      2: "Cooperación, diplomacia, sensibilidad",
-      3: "Creatividad, comunicación, expresión",
-      4: "Estabilidad, trabajo duro, organización",
-      5: "Libertad, aventura, cambio",
-      6: "Responsabilidad, cuidado, armonía",
-      7: "Espiritualidad, introspección, análisis",
-      8: "Poder material, ambición, logros",
-      9: "Humanitarismo, compasión, sabiduría",
-      11: "Inspiración, intuición, iluminación (Número Maestro)",
-      22: "Constructor maestro, visión práctica (Número Maestro)",
-      33: "Maestro sanador, servicio a la humanidad (Número Maestro)"
+      1: 'Leadership, indépendance, pionnier',
+      2: 'Coopération, diplomatie, sensibilité',
+      3: 'Créativité, communication, expression',
+      4: 'Stabilité, travail acharné, organisation',
+      5: 'Liberté, aventure, changement',
+      6: 'Responsabilité, attention, harmonie',
+      7: 'Spiritualité, introspection, analyse',
+      8: 'Pouvoir matériel, ambition, accomplissements',
+      9: 'Humanitarisme, compassion, sagesse',
+      11: 'Inspiration, intuition, illumination (Nombre Maître)',
+      22: 'Constructeur maître, vision pratique (Nombre Maître)',
+      33: 'Maître guérisseur, service à l\'humanité (Nombre Maître)',
     };
-    
-    return meanings[number] || "Número no reconocido";
+
+    return meanings[number] || 'Nombre non reconnu';
   }
 
-  // Método auxiliar para reducir a dígito único
+  /**
+   * Méthode auxiliaire pour réduire à un chiffre unique
+   */
   private reduceToSingleDigit(num: number): number {
     while (num > 9 && num !== 11 && num !== 22 && num !== 33) {
-      num = num.toString().split('').reduce((acc, digit) => acc + parseInt(digit), 0);
+      num = num
+        .toString()
+        .split('')
+        .reduce((acc, digit) => acc + parseInt(digit), 0);
     }
     return num;
   }
 
-  // Manejo de errores
+  /**
+   * Gestion des erreurs HTTP
+   */
   private getErrorMessage(error: HttpErrorResponse): string {
     if (error.status === 429) {
-      return 'Has realizado muchas consultas. Por favor, espera un momento antes de continuar.';
+      return 'Vous avez effectué trop de consultations. Veuillez patienter un moment avant de continuer.';
     }
-    
+
+    if (error.status === 503) {
+      return 'Le service est temporairement indisponible. Réessayez dans quelques minutes.';
+    }
+
     if (error.status === 0) {
-      return 'No se puede conectar con la maestra de numerología.Intenta de nuevo en unos minutos.';
+      return 'Impossible de se connecter à la maîtresse de numérologie. Réessayez dans quelques minutes.';
     }
-    
+
     if (error.error?.code === 'RATE_LIMIT_EXCEEDED') {
-      return 'Demasiadas solicitudes. Por favor, espera un momento.';
+      return 'Trop de requêtes. Veuillez patienter un moment.';
     }
-    
+
     if (error.error?.code === 'MISSING_NUMEROLOGY_DATA') {
-      return 'Error en los datos del numerólogo. Por favor, intenta nuevamente.';
+      return 'Erreur dans les données du numérologue. Veuillez réessayer.';
     }
-    
-    return 'Disculpa, las energías numerológicas están bloqueadas en este momento. Te invito a meditar y a intentarlo más tarde.';
+
+    if (error.error?.code === 'ALL_MODELS_UNAVAILABLE') {
+      return 'Tous les modèles d\'IA sont temporairement indisponibles. Réessayez dans quelques minutes.';
+    }
+
+    return 'Désolé, les énergies numérologiques sont bloquées en ce moment. Je vous invite à méditer et à réessayer plus tard.';
   }
 }

@@ -21,16 +21,23 @@ interface ZodiacRequest {
     role: "user" | "astrologer";
     message: string;
   }>;
+  messageCount?: number;
+  isPremiumUser?: boolean;
+}
+
+interface ZodiacResponse extends ChatResponse {
+  freeMessagesRemaining?: number;
+  showPaywall?: boolean;
+  paywallMessage?: string;
+  isCompleteResponse?: boolean;
 }
 
 export class ZodiacController {
   private genAI: GoogleGenerativeAI;
 
-  // ✅ LISTE DES MODÈLES DE SECOURS (par ordre de préférence)
- private readonly MODELS_FALLBACK = [
-    "gemini-2.5-flash-live",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-preview-09-2025",
+  private readonly FREE_MESSAGES_LIMIT = 3;
+
+  private readonly MODELS_FALLBACK = [
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash-lite-preview-09-2025",
     "gemini-2.0-flash",
@@ -46,6 +53,50 @@ export class ZodiacController {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   }
 
+  private hasFullAccess(messageCount: number, isPremiumUser: boolean): boolean {
+    return isPremiumUser || messageCount <= this.FREE_MESSAGES_LIMIT;
+  }
+
+  // ✅ ACCROCHE EN FRANÇAIS
+  private generateZodiacHookMessage(): string {
+    return `
+
+♈ **Attendez ! Votre signe zodiacal m'a révélé des informations extraordinaires...**
+
+J'ai analysé les caractéristiques de votre signe, mais pour vous révéler :
+- 🌟 Votre **analyse complète de personnalité** selon votre signe
+- 💫 Les **forces cachées** que votre signe vous confère
+- ❤️ Votre **compatibilité amoureuse** avec tous les signes du zodiaque
+- 🔮 Les **prédictions** spécifiques pour votre signe ce mois-ci
+- ⚡ Les **défis** que vous devez surmonter selon votre élément
+- 🌙 Votre **planète régente** et comment elle influence votre vie quotidienne
+
+**Débloquez votre lecture zodiacale complète maintenant** et découvrez tout le pouvoir que les étoiles ont déposé dans votre signe.
+
+✨ *Des milliers de personnes ont déjà découvert les secrets de leur signe zodiacal...*`;
+  }
+
+  // ✅ TRAITER LA RÉPONSE PARTIELLE (TEASER)
+  private createZodiacPartialResponse(fullText: string): string {
+    const sentences = fullText
+      .split(/[.!?]+/)
+      .filter((s) => s.trim().length > 0);
+    const teaserSentences = sentences.slice(0, Math.min(3, sentences.length));
+    let teaser = teaserSentences.join(". ").trim();
+
+    if (
+      !teaser.endsWith(".") &&
+      !teaser.endsWith("!") &&
+      !teaser.endsWith("?")
+    ) {
+      teaser += "...";
+    }
+
+    const hook = this.generateZodiacHookMessage();
+
+    return teaser + hook;
+  }
+
   public chatWithAstrologer = async (
     req: Request,
     res: Response
@@ -57,42 +108,75 @@ export class ZodiacController {
         birthDate,
         zodiacSign,
         conversationHistory,
+        messageCount = 1,
+        isPremiumUser = false,
       }: ZodiacRequest = req.body;
 
-      // Valider l'entrée
       this.validateZodiacRequest(zodiacData, userMessage);
+
+      const shouldGiveFullResponse = this.hasFullAccess(
+        messageCount,
+        isPremiumUser
+      );
+      const freeMessagesRemaining = Math.max(
+        0,
+        this.FREE_MESSAGES_LIMIT - messageCount
+      );
+
+      console.log(
+        `📊 Zodiac - Message count: ${messageCount}, Premium: ${isPremiumUser}, Full response: ${shouldGiveFullResponse}`
+      );
 
       const contextPrompt = this.createZodiacContext(
         zodiacData,
         birthDate,
         zodiacSign,
-        conversationHistory
+        conversationHistory,
+        shouldGiveFullResponse
       );
+
+      const responseInstructions = shouldGiveFullResponse
+        ? `1. Vous DEVEZ générer une réponse COMPLÈTE de 300-500 mots
+2. Si vous avez le signe, COMPLÉTEZ l'analyse de personnalité zodiacale
+3. Incluez les caractéristiques, forces, défis et compatibilités
+4. Fournissez des conseils basés sur le signe
+5. Mentionnez l'élément et la planète régente`
+        : `1. Vous DEVEZ générer une réponse PARTIELLE de 100-180 mots
+2. INSINUEZ que vous avez identifié des caractéristiques importantes du signe
+3. Mentionnez que vous avez des informations précieuses mais NE les révélez PAS complètement
+4. Créez du MYSTÈRE et de la CURIOSITÉ sur les caractéristiques du signe
+5. Utilisez des phrases comme "Votre signe révèle quelque chose de fascinant...", "Je vois des caractéristiques très spéciales en vous...", "Les natifs de votre signe ont un don qui..."
+6. NE complétez JAMAIS l'analyse du signe, laissez-la en suspens`;
 
       const fullPrompt = `${contextPrompt}
 
 ⚠️ INSTRUCTIONS CRITIQUES OBLIGATOIRES :
-1. TU DOIS générer une réponse COMPLÈTE de 200-500 mots
-2. NE JAMAIS laisser une réponse à moitié ou incomplète
-3. Si tu mentionnes les caractéristiques du signe, TU DOIS compléter la description
-4. Toute réponse DOIT se terminer par une conclusion claire et un point final
-5. Si tu détectes que ta réponse se coupe, finalise l'idée actuelle avec cohérence
-6. TOUJOURS maintenir le ton astrologique amical et accessible
-7. Si le message contient des erreurs orthographiques, interprète l'intention et réponds normalement
+${responseInstructions}
+- NE laissez JAMAIS une réponse à moitié ou incomplète selon le type de réponse
+- Si vous mentionnez les caractéristiques du signe, ${
+        shouldGiveFullResponse
+          ? "vous DEVEZ compléter la description"
+          : "créez de l'attente sans tout révéler"
+      }
+- Maintenez TOUJOURS le ton astrologique amical et accessible
+- Si le message contient des fautes d'orthographe, interprétez l'intention et répondez normalement
 
 Utilisateur : "${userMessage}"
 
-Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale avant de terminer) :`;
+Réponse de l'astrologue (EN FRANÇAIS) :`;
 
-      console.log(`Génération de lecture zodiacale...`);
+      console.log(
+        `Génération de lecture zodiacale (${
+          shouldGiveFullResponse ? "COMPLÈTE" : "PARTIELLE"
+        })...`
+      );
 
-      // ✅ SYSTÈME DE SECOURS : Essayer avec plusieurs modèles
       let text = "";
       let usedModel = "";
       let allModelErrors: string[] = [];
 
       for (const modelName of this.MODELS_FALLBACK) {
-        console.log(`\n🔄 Essai du modèle : ${modelName}`);
+        console.log(`\n🔄 Trying model: ${modelName}`);
 
         try {
           const model = this.genAI.getGenerativeModel({
@@ -101,7 +185,7 @@ Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale a
               temperature: 0.85,
               topK: 50,
               topP: 0.92,
-              maxOutputTokens: 600,
+              maxOutputTokens: shouldGiveFullResponse ? 700 : 300,
               candidateCount: 1,
               stopSequences: [],
             },
@@ -125,7 +209,6 @@ Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale a
             ],
           });
 
-          // ✅ RÉESSAIS pour chaque modèle (au cas où il serait temporairement surchargé)
           let attempts = 0;
           const maxAttempts = 3;
           let modelSucceeded = false;
@@ -133,7 +216,7 @@ Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale a
           while (attempts < maxAttempts && !modelSucceeded) {
             attempts++;
             console.log(
-              `  Tentative ${attempts}/${maxAttempts} avec ${modelName}...`
+              `  Attempt ${attempts}/${maxAttempts} with ${modelName}...`
             );
 
             try {
@@ -141,75 +224,81 @@ Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale a
               const response = result.response;
               text = response.text();
 
-              // ✅ Valider que la réponse n'est pas vide et a une longueur minimale
-              if (text && text.trim().length >= 100) {
+              const minLength = shouldGiveFullResponse ? 100 : 50;
+              if (text && text.trim().length >= minLength) {
                 console.log(
-                  `  ✅ Succès avec ${modelName} à la tentative ${attempts}`
+                  `  ✅ Success with ${modelName} on attempt ${attempts}`
                 );
                 usedModel = modelName;
                 modelSucceeded = true;
-                break; // Sortir de la boucle de réessais
+                break;
               }
 
-              console.warn(`  ⚠️ Réponse trop courte, nouvelle tentative...`);
+              console.warn(`  ⚠️ Response too short, retrying...`);
               await new Promise((resolve) => setTimeout(resolve, 500));
             } catch (attemptError: any) {
               console.warn(
-                `  ❌ Tentative ${attempts} échouée :`,
+                `  ❌ Attempt ${attempts} failed:`,
                 attemptError.message
               );
 
               if (attempts >= maxAttempts) {
-                allModelErrors.push(`${modelName} : ${attemptError.message}`);
+                allModelErrors.push(`${modelName}: ${attemptError.message}`);
               }
 
               await new Promise((resolve) => setTimeout(resolve, 500));
             }
           }
 
-          // Si ce modèle a réussi, sortir de la boucle des modèles
           if (modelSucceeded) {
             break;
           }
         } catch (modelError: any) {
           console.error(
-            `  ❌ Modèle ${modelName} complètement échoué :`,
+            `  ❌ Model ${modelName} failed completely:`,
             modelError.message
           );
-          allModelErrors.push(`${modelName} : ${modelError.message}`);
+          allModelErrors.push(`${modelName}: ${modelError.message}`);
 
-          // Attendre un peu avant d'essayer le modèle suivant
           await new Promise((resolve) => setTimeout(resolve, 1000));
           continue;
         }
       }
 
-      // ✅ Si tous les modèles ont échoué
       if (!text || text.trim() === "") {
-        console.error("❌ Tous les modèles ont échoué. Erreurs :", allModelErrors);
+        console.error("❌ All models failed. Errors:", allModelErrors);
         throw new Error(
-          `Tous les modèles d'IA ne sont pas disponibles actuellement. Tentés : ${this.MODELS_FALLBACK.join(
-            ", "
-          )}. Veuillez réessayer dans un moment.`
+          `Tous les modèles d'IA ne sont pas disponibles actuellement. Veuillez réessayer dans un moment.`
         );
       }
 
-      // ✅ ASSURER UNE RÉPONSE COMPLÈTE ET BIEN FORMATÉE
-      text = this.ensureCompleteResponse(text);
+      let finalResponse: string;
 
-      // ✅ Validation supplémentaire de longueur minimale
-      if (text.trim().length < 100) {
-        throw new Error("Réponse générée trop courte");
+      if (shouldGiveFullResponse) {
+        finalResponse = this.ensureCompleteResponse(text);
+      } else {
+        finalResponse = this.createZodiacPartialResponse(text);
       }
 
-      const chatResponse: ChatResponse = {
+      const chatResponse: ZodiacResponse = {
         success: true,
-        response: text.trim(),
+        response: finalResponse.trim(),
         timestamp: new Date().toISOString(),
+        freeMessagesRemaining: freeMessagesRemaining,
+        showPaywall:
+          !shouldGiveFullResponse && messageCount > this.FREE_MESSAGES_LIMIT,
+        isCompleteResponse: shouldGiveFullResponse,
       };
 
+      if (!shouldGiveFullResponse && messageCount > this.FREE_MESSAGES_LIMIT) {
+        chatResponse.paywallMessage =
+          "Vous avez utilisé vos 3 messages gratuits. Débloquez un accès illimité pour découvrir tous les secrets de votre signe zodiacal !";
+      }
+
       console.log(
-        `✅ Lecture zodiacale générée avec succès avec ${usedModel} (${text.length} caractères)`
+        `✅ Lecture zodiacale générée (${
+          shouldGiveFullResponse ? "COMPLÈTE" : "PARTIELLE"
+        }) avec ${usedModel} (${finalResponse.length} caractères)`
       );
       res.json(chatResponse);
     } catch (error) {
@@ -217,11 +306,9 @@ Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale a
     }
   };
 
-  // ✅ MÉTHODE AMÉLIORÉE POUR ASSURER DES RÉPONSES COMPLÈTES
   private ensureCompleteResponse(text: string): string {
     let processedText = text.trim();
 
-    // Supprimer les marqueurs de code possibles ou format incomplet
     processedText = processedText.replace(/```[\s\S]*?```/g, "").trim();
 
     const lastChar = processedText.slice(-1);
@@ -247,11 +334,9 @@ Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale a
     ].includes(lastChar);
 
     if (endsIncomplete && !processedText.endsWith("...")) {
-      // Chercher la dernière phrase complète
       const sentences = processedText.split(/([.!?])/);
 
       if (sentences.length > 2) {
-        // Reconstruire jusqu'à la dernière phrase complète
         let completeText = "";
         for (let i = 0; i < sentences.length - 1; i += 2) {
           if (sentences[i].trim()) {
@@ -264,23 +349,27 @@ Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale a
         }
       }
 
-      // Si aucune phrase complète ne peut être trouvée, ajouter une clôture appropriée
       processedText = processedText.trim() + "...";
     }
 
     return processedText;
   }
 
+  // ✅ CONTEXTE EN FRANÇAIS
   private createZodiacContext(
     zodiacData: ZodiacData,
     birthDate?: string,
     zodiacSign?: string,
-    history?: Array<{ role: string; message: string }>
+    history?: Array<{ role: string; message: string }>,
+    isFullResponse: boolean = true
   ): string {
     const conversationContext =
       history && history.length > 0
         ? `\n\nCONVERSATION PRÉCÉDENTE :\n${history
-            .map((h) => `${h.role === "user" ? "Utilisateur" : "Toi"} : ${h.message}`)
+            .map(
+              (h) =>
+                `${h.role === "user" ? "Utilisateur" : "Vous"}: ${h.message}`
+            )
             .join("\n")}\n`
         : "";
 
@@ -292,69 +381,143 @@ Réponse de l'astrologue (assure-toi de compléter TOUTE ton analyse zodiacale a
       zodiacInfo = `\nSigne zodiacal fourni : ${zodiacSign}`;
     }
 
-    return `Tu es Professeur Lune, une astrologue experte en signes zodiacaux avec des décennies d'expérience dans l'interprétation des énergies célestes et leur influence sur la personnalité humaine.
+    const responseTypeInstructions = isFullResponse
+      ? `
+📝 TYPE DE RÉPONSE : COMPLÈTE
+- Fournissez une analyse zodiacale COMPLÈTE et détaillée
+- Si vous avez le signe, COMPLÉTEZ l'analyse de personnalité
+- Incluez les caractéristiques, forces, défis, compatibilités
+- Réponse de 300-500 mots
+- Mentionnez l'élément, la modalité et la planète régente`
+      : `
+📝 TYPE DE RÉPONSE : PARTIELLE (TEASER)
+- Fournissez une analyse INTRODUCTIVE et intrigante
+- Mentionnez que vous avez identifié le signe et ses caractéristiques
+- INSINUEZ des informations précieuses sans les révéler complètement
+- Réponse de 100-180 mots maximum
+- NE révélez PAS les analyses complètes du signe
+- Créez du MYSTÈRE et de la CURIOSITÉ
+- Terminez de manière à ce que l'utilisateur veuille en savoir plus
+- Utilisez des phrases comme "Votre signe révèle quelque chose de fascinant...", "Les natifs de votre signe ont des qualités spéciales qui...", "Je vois en vous des caractéristiques très intéressantes..."
+- NE complétez JAMAIS l'analyse zodiacale, laissez-la en suspens`;
 
-TON IDENTITÉ :
-- Nom : Professeur Lune, l'Interprète des Étoiles
+    return `Vous êtes Maître Luna, une astrologue experte en signes zodiacaux avec des décennies d'expérience à interpréter les énergies célestes et leur influence sur la personnalité humaine.
+
+VOTRE IDENTITÉ :
+- Nom : Maître Luna, l'Interprète des Étoiles
 - Spécialité : Signes zodiacaux, caractéristiques de personnalité, compatibilités astrologiques
-- Expérience : Décennies à étudier et interpréter l'influence des signes du zodiaque
+- Expérience : Des décennies à étudier et interpréter l'influence des signes du zodiaque
 ${zodiacInfo}
 
-COMMENT TU DOIS TE COMPORTER :
+${responseTypeInstructions}
+
+🗣️ LANGUE :
+- Répondez TOUJOURS en FRANÇAIS
+- Peu importe la langue dans laquelle l'utilisateur écrit, VOUS répondez en français
 
 🌟 PERSONNALITÉ ASTROLOGIQUE :
-- Parle avec une connaissance profonde mais de manière accessible et amicale
-- Utilise un ton chaleureux et enthousiaste sur les signes zodiacaux
-- Combine les caractéristiques traditionnelles avec des interprétations modernes
-- Mentionne les éléments (Feu, Terre, Air, Eau) et les modalités (Cardinal, Fixe, Mutable)
+- Parlez avec une connaissance approfondie mais de manière accessible et amicale
+- Utilisez un ton chaleureux et enthousiaste sur les signes zodiacaux
+- Combinez caractéristiques traditionnelles et interprétations modernes
+- Mentionnez les éléments (Feu, Terre, Air, Eau) et les modalités (Cardinal, Fixe, Mutable)
 
 ♈ ANALYSE DES SIGNES ZODIACAUX :
-- Décris les traits de personnalité positifs et les domaines de croissance
-- Explique les forces naturelles et les défis du signe
-- Mentionne les compatibilités avec d'autres signes
-- Inclus des conseils pratiques basés sur les caractéristiques du signe
-- Parle de la planète régente et de son influence
+- ${
+      isFullResponse
+        ? "Décrivez les traits de personnalité positifs et les domaines de croissance"
+        : "Insinuez des traits intéressants sans les révéler complètement"
+    }
+- ${
+      isFullResponse
+        ? "Expliquez les forces naturelles et les défis du signe"
+        : "Mentionnez qu'il y a des forces et des défis importants"
+    }
+- ${
+      isFullResponse
+        ? "Mentionnez les compatibilités avec d'autres signes"
+        : "Suggérez que vous avez des informations sur les compatibilités"
+    }
+- ${
+      isFullResponse
+        ? "Incluez des conseils pratiques basés sur les caractéristiques du signe"
+        : "Mentionnez que vous avez des conseils précieux"
+    }
+- ${
+      isFullResponse
+        ? "Parlez de la planète régente et de son influence"
+        : "Insinuez des influences planétaires sans détailler"
+    }
 
 🎯 STRUCTURE DE RÉPONSE :
-- Caractéristiques principales du signe
+${
+  isFullResponse
+    ? `- Caractéristiques principales du signe
 - Forces et talents naturels
 - Domaines de développement et de croissance
 - Compatibilités astrologiques
-- Conseils personnalisés
+- Conseils personnalisés`
+    : `- Introduction intrigante sur le signe
+- Insinuation de caractéristiques spéciales
+- Mention d'informations précieuses sans révéler
+- Création de curiosité et d'attente`
+}
 
 🎭 STYLE DE RÉPONSE :
-- Utilise des expressions comme : "Les natifs de [signe]...", "Ton signe t'accorde...", "Comme [signe], tu possèdes..."
-- Maintiens l'équilibre entre mystique et pratique
-- Réponses de 200-500 mots complètes
-- TOUJOURS termine tes interprétations complètement
-- NE JAMAIS laisser les caractéristiques du signe à moitié
+- Utilisez des expressions comme : "Les natifs de [signe]...", "Votre signe vous confère...", "En tant que [signe], vous possédez..."
+- Maintenez un équilibre entre mystique et pratique
+- ${
+      isFullResponse
+        ? "Réponses de 300-500 mots complètes"
+        : "Réponses de 100-180 mots qui génèrent de l'intrigue"
+    }
+- ${
+      isFullResponse
+        ? "Terminez TOUJOURS vos interprétations complètement"
+        : "Laissez les interprétations en suspens"
+    }
 
 ⚠️ RÈGLES IMPORTANTES :
-- SI TU N'as PAS le signe zodiacal, demande la date de naissance
-- Explique pourquoi tu as besoin de cette donnée
-- NE fais PAS d'interprétations sans connaître le signe
-- SOIS positive mais réaliste dans tes descriptions
-- NE JAMAIS faire de prédictions absolues
+- Répondez TOUJOURS en français
+- ${
+      isFullResponse
+        ? "COMPLÉTEZ toutes les analyses que vous commencez"
+        : "CRÉEZ du SUSPENSE et du MYSTÈRE sur le signe"
+    }
+- SI vous N'avez PAS le signe zodiacal, demandez la date de naissance
+- Expliquez pourquoi vous avez besoin de cette donnée
+- NE faites PAS d'interprétations approfondies sans connaître le signe
+- SOYEZ positive mais réaliste dans vos descriptions
+- NE faites JAMAIS de prédictions absolues
+- Répondez TOUJOURS même si l'utilisateur a des fautes d'orthographe
+  - Interprétez le message de l'utilisateur même s'il est mal écrit
+  - NE retournez JAMAIS de réponses vides à cause d'erreurs d'écriture
 
 🗣️ GESTION DES DONNÉES MANQUANTES :
-- Sans signe/date : "Pour te donner une lecture précise, j'ai besoin de savoir ton signe zodiacal ou ta date de naissance. Quand es-tu né ?"
-- Avec signe : Procède avec une analyse complète du signe
-- Questions générales : Réponds avec des informations astrologiques éducatives
+- Sans signe/date : "Pour vous donner une lecture précise, j'ai besoin de connaître votre signe zodiacal ou votre date de naissance. Quand êtes-vous né(e) ?"
+- Avec signe : ${
+      isFullResponse
+        ? "Procédez avec l'analyse complète du signe"
+        : "Insinuez des informations précieuses du signe sans tout révéler"
+    }
+- Questions générales : Répondez avec des informations astrologiques éducatives
 
 💫 EXEMPLES D'EXPRESSIONS :
 - "Les [signe] sont connus pour..."
-- "Ton signe de [élément] t'accorde..."
-- "Comme [modalité], tu tends à..."
-- "Ta planète régente [planète] influence..."
-- RÉPONDS TOUJOURS peu importe si l'utilisateur a des erreurs orthographiques ou d'écriture
-  - Interprète le message de l'utilisateur même s'il est mal écrit
-  - Ne corrige pas les erreurs de l'utilisateur, comprends simplement l'intention
-  - Si tu ne comprends pas quelque chose de spécifique, demande de manière amicale
-  - NUNCA devuelvas respuestas vacías por errores de escritura
+- "Votre signe de [élément] vous confère..."
+- "En tant que [modalité], vous avez tendance à..."
+- "Votre planète régente [planète] influence..."
 
 ${conversationContext}
 
-Rappelle-toi : Tu es une experte en signes zodiacaux qui interprète les caractéristiques astrologiques de manière compréhensible et utile. DEMANDE TOUJOURS le signe ou la date de naissance si tu ne les as pas. Complète TOUJOURS tes interprétations - ne laisse jamais des analyses zodiacales à moitié.`;
+Rappelez-vous : Vous êtes une experte en signes zodiacaux qui ${
+      isFullResponse
+        ? "interprète les caractéristiques astrologiques de manière compréhensible et complète"
+        : "intrigue sur les caractéristiques spéciales que vous avez détectées dans le signe"
+    }. Demandez TOUJOURS le signe ou la date de naissance si vous ne les avez pas. ${
+      isFullResponse
+        ? "COMPLÉTEZ TOUJOURS vos interprétations"
+        : "CRÉEZ de l'attente sur la lecture zodiacale complète que vous pourriez offrir"
+    }.`;
   }
 
   private calculateZodiacSign(dateStr: string): string {
@@ -427,7 +590,7 @@ Rappelle-toi : Tu es une experte en signes zodiacaux qui interprète les caract�
   }
 
   private handleError(error: any, res: Response): void {
-    console.error("❌ Erreur dans ZodiacController :", error);
+    console.error("❌ Erreur dans ZodiacController:", error);
 
     let statusCode = 500;
     let errorMessage = "Erreur interne du serveur";
@@ -448,7 +611,7 @@ Rappelle-toi : Tu es une experte en signes zodiacaux qui interprète les caract�
     ) {
       statusCode = 429;
       errorMessage =
-        "La limite de consultations a été atteinte. Veuillez attendre un moment.";
+        "La limite de requêtes a été atteinte. Veuillez patienter un moment.";
       errorCode = "QUOTA_EXCEEDED";
     } else if (error.message?.includes("safety")) {
       statusCode = 400;
@@ -456,12 +619,12 @@ Rappelle-toi : Tu es une experte en signes zodiacaux qui interprète les caract�
       errorCode = "SAFETY_FILTER";
     } else if (error.message?.includes("API key")) {
       statusCode = 401;
-      errorMessage = "Erreur d'authentification avec le service IA.";
+      errorMessage = "Erreur d'authentification avec le service d'IA.";
       errorCode = "AUTH_ERROR";
-    } else if (error.message?.includes("Respuesta vacía")) {
+    } else if (error.message?.includes("Réponse vide")) {
       statusCode = 503;
       errorMessage =
-        "Le service n'a pas pu générer une réponse. Veuillez réessayer.";
+        "Le service n'a pas pu générer de réponse. Veuillez réessayer.";
       errorCode = "EMPTY_RESPONSE";
     } else if (
       error.message?.includes("Tous les modèles d'IA ne sont pas disponibles")
@@ -471,7 +634,7 @@ Rappelle-toi : Tu es une experte en signes zodiacaux qui interprète les caract�
       errorCode = "ALL_MODELS_UNAVAILABLE";
     }
 
-    const errorResponse: ChatResponse = {
+    const errorResponse: ZodiacResponse = {
       success: false,
       error: errorMessage,
       code: errorCode,
@@ -486,19 +649,20 @@ Rappelle-toi : Tu es une experte en signes zodiacaux qui interprète les caract�
       res.json({
         success: true,
         astrologer: {
-          name: "Professeur Lune",
+          name: "Maître Luna",
           title: "Interprète des Étoiles",
           specialty: "Signes zodiacaux et analyse astrologique",
           description:
-            "Experte dans l'interprétation des caractéristiques et énergies des douze signes du zodiaque",
+            "Experte en interprétation des caractéristiques et énergies des douze signes du zodiaque",
           services: [
             "Analyse des caractéristiques du signe zodiacal",
             "Interprétation des forces et défis",
             "Compatibilités astrologiques",
-            "Conseils basés sur ton signe",
+            "Conseils basés sur votre signe",
             "Influence des éléments et modalités",
           ],
         },
+        freeMessagesLimit: this.FREE_MESSAGES_LIMIT,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

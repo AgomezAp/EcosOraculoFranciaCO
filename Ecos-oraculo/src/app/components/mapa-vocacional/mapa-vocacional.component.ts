@@ -20,7 +20,10 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatStepperModule } from '@angular/material/stepper';
-import { MapaVocacionalService } from '../../services/mapa-vocacional.service';
+import {
+  MapaVocacionalService,
+  VocationalResponse,
+} from '../../services/mapa-vocacional.service';
 import { PaypalService } from '../../services/paypal.service';
 import { HttpClient } from '@angular/common/http';
 import { RecolectaDatosComponent } from '../recolecta-datos/recolecta-datos.component';
@@ -29,20 +32,19 @@ import {
   FortuneWheelComponent,
   Prize,
 } from '../fortune-wheel/fortune-wheel.component';
-interface VocationalMessage {
-  sender: string;
-  content: string;
-  timestamp: Date;
-  isUser: boolean;
-  id?: string;
-}
+
 interface ChatMessage {
   sender: string;
   content: string;
   timestamp: Date;
   isUser: boolean;
   id?: string;
+  freeMessagesRemaining?: number;
+  showPaywall?: boolean;
+  isCompleteResponse?: boolean;
+  isPrizeAnnouncement?: boolean;
 }
+
 interface AssessmentQuestion {
   id: number;
   question: string;
@@ -73,15 +75,6 @@ interface VocationalProfile {
   workEnvironments: string[];
 }
 
-interface AnalysisResult {
-  profileDistribution: Array<{
-    category: string;
-    count: number;
-    percentage: number;
-  }>;
-  dominantProfile: VocationalProfile;
-  recommendations: string[];
-}
 @Component({
   selector: 'app-mapa-vocacional',
   imports: [
@@ -98,7 +91,6 @@ interface AnalysisResult {
     MatStepperModule,
     MatProgressBarModule,
     RecolectaDatosComponent,
-    FortuneWheelComponent,
   ],
   templateUrl: './mapa-vocacional.component.html',
   styleUrl: './mapa-vocacional.component.css',
@@ -109,19 +101,19 @@ export class MapaVocacionalComponent
 {
   @ViewChild('chatContainer') chatContainer!: ElementRef;
 
-  // Info del consejero
+  // Info du conseiller
   counselorInfo = {
-    name: 'Dr. Valeria',
+    name: 'Dr. Valérie',
     title: 'Spécialiste en Orientation Professionnelle',
     specialty:
-      'Orientation professionnelle et cartes professionnelles personnalisées',
+      'Orientation professionnelle et cartes de carrière personnalisées',
   };
 
-  //Datos para enviar
+  // Données à envoyer
   showDataModal: boolean = false;
   userData: any = null;
 
-  // Estado de pestañas
+  // État des onglets
   currentTab: 'chat' | 'assessment' | 'results' = 'chat';
 
   // Chat
@@ -129,46 +121,50 @@ export class MapaVocacionalComponent
   currentMessage: string = '';
   isLoading: boolean = false;
 
-  // AGREGADO - Variables para auto-scroll
+  // Variables pour le défilement automatique
   private shouldAutoScroll = true;
   private lastMessageCount = 0;
 
-  // AGREGADO - Variables para control de pagos con PayPal
+  // Variables pour le contrôle des paiements avec PayPal
   showPaymentModal: boolean = false;
   isProcessingPayment: boolean = false;
   paymentError: string | null = null;
   hasUserPaidForVocational: boolean = false;
-  firstQuestionAsked: boolean = false;
   blockedMessageId: string | null = null;
-  //Variables para la ruleta
+
+  // ✅ NOUVEAU : Système de 3 messages gratuits
+  private userMessageCount: number = 0;
+  private readonly FREE_MESSAGES_LIMIT = 3;
+
+  // Variables pour la roue de la fortune
   showFortuneWheel: boolean = false;
   vocationalPrizes: Prize[] = [
     {
       id: '1',
-      name: '3 Consultations Gratuites',
+      name: '3 consultations gratuites',
       color: '#4ecdc4',
       icon: '🎯',
     },
     {
       id: '2',
-      name: '1 Analyse Professionnelle Premium',
+      name: '1 Analyse de Carrière Premium',
       color: '#45b7d1',
       icon: '✨',
     },
     {
       id: '4',
-      name: 'Réessaie!',
+      name: 'Réessayez !',
       color: '#ff7675',
       icon: '🔄',
     },
   ];
   private wheelTimer: any;
 
-  // Datos personales
+  // Données personnelles
   showPersonalForm: boolean = false;
   personalInfo: PersonalInfo = {};
 
-  // Assessment
+  // Évaluation
   assessmentQuestions: AssessmentQuestion[] = [];
   currentQuestionIndex: number = 0;
   selectedOption: string = '';
@@ -184,9 +180,11 @@ export class MapaVocacionalComponent
     private cdr: ChangeDetectorRef,
     private paypalService: PaypalService
   ) {}
+
   ngAfterViewInit(): void {
-    this.setVideosSpeed(0.67); // 0.5 = más lento, 1 = normal
+    this.setVideosSpeed(0.67);
   }
+
   private setVideosSpeed(rate: number): void {
     const host = this.elRef.nativeElement;
     const videos = host.querySelectorAll<HTMLVideoElement>('video');
@@ -196,11 +194,19 @@ export class MapaVocacionalComponent
       else v.addEventListener('loadedmetadata', apply, { once: true });
     });
   }
+
   async ngOnInit(): Promise<void> {
-    // ✅ Verificar pago SOLO de este servicio específico
+    // Vérifier le paiement de ce service spécifique
     this.hasUserPaidForVocational =
-      sessionStorage.getItem('hasUserPaidForVocational_carte-vocationnelle') ===
-      'true';
+      sessionStorage.getItem('hasUserPaidForVocational_berufskarte') === 'true';
+
+    // ✅ NOUVEAU : Charger le compteur de messages
+    const savedMessageCount = sessionStorage.getItem(
+      'vocationalUserMessageCount'
+    );
+    if (savedMessageCount) {
+      this.userMessageCount = parseInt(savedMessageCount, 10);
+    }
 
     const paymentStatus = this.paypalService.checkPaymentStatusFromUrl();
 
@@ -211,48 +217,38 @@ export class MapaVocacionalComponent
         );
 
         if (verification.valid && verification.status === 'approved') {
-          // ✅ Pago SOLO para este servicio (Carte Vocationnelle)
           this.hasUserPaidForVocational = true;
           sessionStorage.setItem(
-            'hasUserPaidForVocational_carte-vocationnelle',
+            'hasUserPaidForVocational_berufskarte',
             'true'
           );
-
-          // NO usar localStorage global - solo sessionStorage específico
           localStorage.removeItem('paypal_payment_completed');
 
           this.blockedMessageId = null;
           sessionStorage.removeItem('vocationalBlockedMessageId');
 
-          // Limpiar URL
           window.history.replaceState(
             {},
             document.title,
             window.location.pathname
           );
 
-          // Cerrar el modal de pago si está abierto
           this.showPaymentModal = false;
           this.isProcessingPayment = false;
           this.paymentError = null;
-
           this.cdr.markForCheck();
 
-          // ✅ MENSAJE VISIBLE DE PAGO EXITOSO CON RETRASO MAYOR
-          // Esperamos a que la vista esté completamente renderizada
           setTimeout(() => {
             this.addMessage({
               sender: this.counselorInfo.name,
               content:
-                '🎉 Paiement effectué avec succès!\n\n' +
-                '✨ Merci pour ton paiement. Tu as maintenant un accès complet à la Carte Professionnelle.\n\n' +
-                '💼 Découvrons ensemble ton avenir professionnel!\n\n' +
-                '📌 Remarque: Ce paiement est valable uniquement pour le service de Carte Professionnelle. Un paiement séparé est requis pour les autres services.',
+                '🎉 Paiement effectué avec succès !\n\n' +
+                '✨ Merci pour votre paiement. Vous avez maintenant un accès complet à la Carte de Carrière.\n\n' +
+                '💼 Découvrons ensemble votre avenir professionnel !\n\n' +
+                '📌 Note : Ce paiement est valable uniquement pour le service de Carte de Carrière.',
               timestamp: new Date(),
               isUser: false,
             });
-
-            // Forzar detección de cambios y scroll
             this.cdr.detectChanges();
             setTimeout(() => {
               this.scrollToBottom();
@@ -260,8 +256,7 @@ export class MapaVocacionalComponent
             }, 200);
           }, 1000);
         } else {
-          // Pago no válido
-          this.paymentError = 'Erreur lors de la vérification du paiement';
+          this.paymentError = "Le paiement n'a pas pu être vérifié.";
           setTimeout(() => {
             this.addMessage({
               sender: this.counselorInfo.name,
@@ -274,14 +269,16 @@ export class MapaVocacionalComponent
           }, 800);
         }
       } catch (error) {
-        console.error('Error verificando pago de PayPal:', error);
-        this.paymentError = "Erreur lors de la vérification du paiement";
-
+        console.error(
+          'Erreur lors de la vérification du paiement PayPal :',
+          error
+        );
+        this.paymentError = 'Erreur lors de la vérification du paiement';
         setTimeout(() => {
           this.addMessage({
             sender: this.counselorInfo.name,
             content:
-              '❌ Une erreur est survenue lors de la vérification du paiement. Veuillez réessayer plus tard.',
+              "❌ Malheureusement, une erreur s'est produite lors de la vérification de votre paiement. Veuillez réessayer plus tard.",
             timestamp: new Date(),
             isUser: false,
           });
@@ -290,7 +287,7 @@ export class MapaVocacionalComponent
       }
     }
 
-    // ✅ NUEVO: Cargar datos del usuario desde sessionStorage
+    // Charger les données de l'utilisateur depuis sessionStorage
     const savedUserData = sessionStorage.getItem('userData');
     if (savedUserData) {
       try {
@@ -302,10 +299,8 @@ export class MapaVocacionalComponent
       this.userData = null;
     }
 
+    // Charger les messages sauvegardés
     const savedMessages = sessionStorage.getItem('vocationalMessages');
-    const savedFirstQuestion = sessionStorage.getItem(
-      'vocationalFirstQuestionAsked'
-    );
     const savedBlockedMessageId = sessionStorage.getItem(
       'vocationalBlockedMessageId'
     );
@@ -317,12 +312,13 @@ export class MapaVocacionalComponent
           ...msg,
           timestamp: new Date(msg.timestamp),
         }));
-        this.firstQuestionAsked = savedFirstQuestion === 'true';
         this.blockedMessageId = savedBlockedMessageId || null;
-      } catch (error) {}
+      } catch (error) {
+        console.error('Erreur lors du parsing des messages :', error);
+      }
     }
 
-    // Solo agregar mensaje de bienvenida si no hay mensajes guardados
+    // Ajouter le message de bienvenue uniquement s'il n'y a pas de messages sauvegardés
     if (this.chatMessages.length === 0) {
       this.initializeWelcomeMessage();
     }
@@ -334,7 +330,14 @@ export class MapaVocacionalComponent
     }
   }
 
-  // AGREGADO - Métodos para control de scroll
+  // ✅ NOUVEAU : Obtenir les messages gratuits restants
+  getFreeMessagesRemaining(): number {
+    if (this.hasUserPaidForVocational) {
+      return -1; // Illimité
+    }
+    return Math.max(0, this.FREE_MESSAGES_LIMIT - this.userMessageCount);
+  }
+
   ngAfterViewChecked(): void {
     if (
       this.shouldAutoScroll &&
@@ -354,78 +357,85 @@ export class MapaVocacionalComponent
     this.shouldAutoScroll = isNearBottom;
   }
 
-  // AGREGADO - Cleanup Stripe
   ngOnDestroy(): void {
     if (this.wheelTimer) {
       clearTimeout(this.wheelTimer);
     }
   }
 
-  // Inicializar mensaje de bienvenida
   initializeWelcomeMessage(): void {
     this.addMessage({
       sender: this.counselorInfo.name,
-      content: `Bonjour! Je suis ${this.counselorInfo.name}, votre spécialiste en orientation professionnelle. Je suis ici pour vous aider à découvrir votre véritable vocation et à concevoir une carte professionnelle personnalisée.`,
+      content: `Bonjour ! Je suis ${this.counselorInfo.name}, votre spécialiste en Orientation Professionnelle. Je suis ici pour vous aider à découvrir votre véritable vocation et à concevoir une carte de carrière personnalisée pour vous.`,
       timestamp: new Date(),
       isUser: false,
     });
     if (FortuneWheelComponent.canShowWheel()) {
       this.showWheelAfterDelay(3000);
-    } else {
     }
   }
 
-  // Cambiar pestaña
   switchTab(tab: 'chat' | 'assessment' | 'results'): void {
     this.currentTab = tab;
   }
 
-  // Chat methods
+  // ✅ MODIFIÉ : sendMessage() avec système de 3 messages gratuits
   sendMessage(): void {
     if (!this.currentMessage.trim() || this.isLoading) return;
 
     const userMessage = this.currentMessage.trim();
 
-    // ✅ NUEVA LÓGICA: Verificar consultas vocacionales gratuitas ANTES de verificar pago
-    if (!this.hasUserPaidForVocational && this.firstQuestionAsked) {
-      // Verificar si tiene consultas vocacionales gratis disponibles
-      if (this.hasFreeVocationalConsultationsAvailable()) {
-        this.useFreeVocationalConsultation();
-        // Continuar con el mensaje sin bloquear
-      } else {
-        // Si no tiene consultas gratis, mostrar modal de datos
+    // Calculer le prochain numéro de message
+    const nextMessageCount = this.userMessageCount + 1;
 
-        // Cerrar otros modales primero
-        this.showFortuneWheel = false;
-        this.showPaymentModal = false;
+    console.log(
+      `📊 Vocationnel - Message #${nextMessageCount}, Premium : ${this.hasUserPaidForVocational}, Limite : ${this.FREE_MESSAGES_LIMIT}`
+    );
 
-        // Guardar el mensaje para procesarlo después del pago
-        sessionStorage.setItem('pendingVocationalMessage', userMessage);
+    // ✅ Vérifier l'accès
+    const canSendMessage =
+      this.hasUserPaidForVocational ||
+      this.hasFreeVocationalConsultationsAvailable() ||
+      nextMessageCount <= this.FREE_MESSAGES_LIMIT;
 
-        this.saveStateBeforePayment();
+    if (!canSendMessage) {
+      console.log('❌ Sans accès - affichage du modal de paiement');
 
-        // Mostrar modal de datos con timeout
-        setTimeout(() => {
-          this.showDataModal = true;
-          this.cdr.markForCheck();
-        }, 100);
+      // Fermer les autres modals
+      this.showFortuneWheel = false;
+      this.showPaymentModal = false;
 
-        return; // Salir aquí para no procesar el mensaje aún
-      }
+      // Sauvegarder le message en attente
+      sessionStorage.setItem('pendingVocationalMessage', userMessage);
+      this.saveStateBeforePayment();
+
+      // Afficher le modal de données
+      setTimeout(() => {
+        this.showDataModal = true;
+        this.cdr.markForCheck();
+      }, 100);
+
+      return;
+    }
+
+    // ✅ Si utilisation d'une consultation gratuite de la roulette (après les 3 gratuites)
+    if (
+      !this.hasUserPaidForVocational &&
+      nextMessageCount > this.FREE_MESSAGES_LIMIT &&
+      this.hasFreeVocationalConsultationsAvailable()
+    ) {
+      this.useFreeVocationalConsultation();
     }
 
     this.shouldAutoScroll = true;
-
-    // Procesar mensaje normalmente
-    this.processUserMessage(userMessage);
+    this.processUserMessage(userMessage, nextMessageCount);
   }
 
-  // AGREGADO - Métodos para pagos
   private saveStateBeforePayment(): void {
     this.saveMessagesToSession();
     sessionStorage.setItem(
-      'vocationalFirstQuestionAsked',
-      this.firstQuestionAsked.toString()
+      'vocationalUserMessageCount',
+      this.userMessageCount.toString()
     );
     if (this.blockedMessageId) {
       sessionStorage.setItem(
@@ -434,81 +444,108 @@ export class MapaVocacionalComponent
       );
     }
   }
-  private processUserMessage(userMessage: string): void {
+
+  // ✅ MODIFIÉ : processUserMessage() pour envoyer messageCount au backend
+  private processUserMessage(userMessage: string, messageCount: number): void {
     this.addMessage({
-      sender: 'Du',
+      sender: 'Vous',
       content: userMessage,
       timestamp: new Date(),
       isUser: true,
     });
 
+    // ✅ Mettre à jour le compteur
+    this.userMessageCount = messageCount;
+    sessionStorage.setItem(
+      'vocationalUserMessageCount',
+      this.userMessageCount.toString()
+    );
+
     this.currentMessage = '';
     this.isLoading = true;
+    this.cdr.markForCheck();
 
-    // Preparar historial de conversación
-    const conversationHistory = this.chatMessages.slice(-10).map((msg) => ({
-      role: msg.isUser ? ('user' as const) : ('counselor' as const),
-      message: msg.content,
-    }));
+    // Préparer l'historique de conversation
+    const conversationHistory = this.chatMessages
+      .filter((msg) => msg.content && !msg.isPrizeAnnouncement)
+      .slice(-10)
+      .map((msg) => ({
+        role: msg.isUser ? ('user' as const) : ('counselor' as const),
+        message: msg.content,
+      }));
 
-    // Enviar al servicio
+    // ✅ Utiliser la nouvelle méthode avec messageCount
     this.vocationalService
-      .sendMessage(
+      .sendMessageWithCount(
         userMessage,
+        messageCount,
+        this.hasUserPaidForVocational,
         this.personalInfo,
         this.assessmentAnswers,
         conversationHistory
       )
       .subscribe({
-        next: (response) => {
+        next: (response: VocationalResponse) => {
           this.isLoading = false;
 
-          const messageId = Date.now().toString();
+          if (response.success && response.response) {
+            const messageId = Date.now().toString();
 
-          this.addMessage({
-            sender: this.counselorInfo.name,
-            content: response,
-            timestamp: new Date(),
-            isUser: false,
-            id: messageId,
-          });
+            this.addMessage({
+              sender: this.counselorInfo.name,
+              content: response.response,
+              timestamp: new Date(),
+              isUser: false,
+              id: messageId,
+              freeMessagesRemaining: response.freeMessagesRemaining,
+              showPaywall: response.showPaywall,
+              isCompleteResponse: response.isCompleteResponse,
+            });
 
-          // ✅ LÓGICA MODIFICADA: Solo bloquear si no tiene consultas gratis Y no ha pagado
-          if (
-            this.firstQuestionAsked &&
-            !this.hasUserPaidForVocational &&
-            !this.hasFreeVocationalConsultationsAvailable()
-          ) {
-            this.blockedMessageId = messageId;
-            sessionStorage.setItem('vocationalBlockedMessageId', messageId);
+            console.log(
+              `📊 Réponse - Messages restants : ${response.freeMessagesRemaining}, Paywall : ${response.showPaywall}, Complète : ${response.isCompleteResponse}`
+            );
 
-            setTimeout(() => {
-              this.saveStateBeforePayment();
+            // ✅ Afficher le paywall si le backend l'indique
+            if (response.showPaywall && !this.hasUserPaidForVocational) {
+              this.blockedMessageId = messageId;
+              sessionStorage.setItem('vocationalBlockedMessageId', messageId);
 
-              // Cerrar otros modales
-              this.showFortuneWheel = false;
-              this.showPaymentModal = false;
-
-              // Mostrar modal de datos
               setTimeout(() => {
-                this.showDataModal = true;
-                this.cdr.markForCheck();
-              }, 100);
-            }, 2000);
-          } else if (!this.firstQuestionAsked) {
-            this.firstQuestionAsked = true;
-            sessionStorage.setItem('vocationalFirstQuestionAsked', 'true');
-          }
+                this.saveStateBeforePayment();
 
-          this.saveMessagesToSession();
-          this.cdr.markForCheck();
+                this.showFortuneWheel = false;
+                this.showPaymentModal = false;
+
+                setTimeout(() => {
+                  this.showDataModal = true;
+                  this.cdr.markForCheck();
+                }, 100);
+              }, 2500);
+            }
+
+            this.saveMessagesToSession();
+            this.cdr.markForCheck();
+          } else {
+            this.addMessage({
+              sender: this.counselorInfo.name,
+              content:
+                response.error ||
+                'Désolé, je rencontre des difficultés techniques. Pourriez-vous reformuler votre question ?',
+              timestamp: new Date(),
+              isUser: false,
+            });
+            this.saveMessagesToSession();
+            this.cdr.markForCheck();
+          }
         },
         error: (error) => {
           this.isLoading = false;
+          console.error('Erreur dans la réponse :', error);
           this.addMessage({
             sender: this.counselorInfo.name,
             content:
-              "Désolé, je rencontre des difficultés techniques. Pourriez-vous reformuler votre question?",
+              'Désolé, je rencontre des difficultés techniques. Pourriez-vous reformuler votre question ?',
             timestamp: new Date(),
             isUser: false,
           });
@@ -517,6 +554,7 @@ export class MapaVocacionalComponent
         },
       });
   }
+
   private saveMessagesToSession(): void {
     try {
       const messagesToSave = this.chatMessages.map((msg) => ({
@@ -530,7 +568,9 @@ export class MapaVocacionalComponent
         'vocationalMessages',
         JSON.stringify(messagesToSave)
       );
-    } catch (error) {}
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des messages :', error);
+    }
   }
 
   isMessageBlocked(message: ChatMessage): boolean {
@@ -538,13 +578,13 @@ export class MapaVocacionalComponent
       message.id === this.blockedMessageId && !this.hasUserPaidForVocational
     );
   }
+
   async promptForPayment(): Promise<void> {
     this.showPaymentModal = true;
     this.cdr.markForCheck();
     this.paymentError = null;
     this.isProcessingPayment = false;
 
-    // Validar datos de usuario
     if (!this.userData) {
       const savedUserData = sessionStorage.getItem('userData');
       if (savedUserData) {
@@ -558,7 +598,8 @@ export class MapaVocacionalComponent
 
     if (!this.userData) {
       this.paymentError =
-        "Aucune donnée client trouvée. Veuillez d'abord remplir le formulaire.";
+        "Données du client introuvables. Veuillez d'abord remplir le formulaire.";
+      this.showPaymentModal = false;
       this.showDataModal = true;
       this.cdr.markForCheck();
       return;
@@ -567,17 +608,18 @@ export class MapaVocacionalComponent
     const email = this.userData.email?.toString().trim();
     if (!email) {
       this.paymentError =
-        "E-mail requise. Veuillez remplir le formulaire.";
+        'Adresse e-mail requise. Veuillez remplir le formulaire.';
+      this.showPaymentModal = false;
       this.showDataModal = true;
       this.cdr.markForCheck();
       return;
     }
 
-    // Guardar mensaje pendiente si existe
     if (this.currentMessage) {
       sessionStorage.setItem('pendingVocationalMessage', this.currentMessage);
     }
   }
+
   showWheelAfterDelay(delayMs: number = 3000): void {
     if (this.wheelTimer) {
       clearTimeout(this.wheelTimer);
@@ -591,7 +633,6 @@ export class MapaVocacionalComponent
       ) {
         this.showFortuneWheel = true;
         this.cdr.markForCheck();
-      } else {
       }
     }, delayMs);
   }
@@ -599,9 +640,10 @@ export class MapaVocacionalComponent
   onPrizeWon(prize: Prize): void {
     const prizeMessage: ChatMessage = {
       sender: this.counselorInfo.name,
-      content: `🎯 Fantastique ! Le destin professionnel vous a béni. Vous avez gagné : **${prize.name}** ${prize.icon}\n\nCe cadeau de l'univers professionnel a été activé pour vous. Les opportunités professionnelles s'alignent en votre faveur. Que cette chance vous guide vers votre véritable vocation !`,
+      content: `🎯 Excellent ! Le destin professionnel vous a béni. Vous avez gagné : **${prize.name}** ${prize.icon}\n\nCe cadeau de l'univers professionnel a été activé pour vous. Les opportunités de carrière s'alignent en votre faveur. Que cette fortune vous guide vers votre véritable vocation !`,
       timestamp: new Date(),
       isUser: false,
+      isPrizeAnnouncement: true,
     };
 
     this.chatMessages.push(prizeMessage);
@@ -625,7 +667,7 @@ export class MapaVocacionalComponent
       this.cdr.markForCheck();
     } else {
       alert(
-        "Vous n'avez pas de tours disponibles. " +
+        "Vous n'avez pas de lancers disponibles. " +
           FortuneWheelComponent.getSpinStatus()
       );
     }
@@ -637,24 +679,22 @@ export class MapaVocacionalComponent
 
   private processVocationalPrize(prize: Prize): void {
     switch (prize.id) {
-      case '1': // 3 Sesiones Gratis
+      case '1': // 3 Sessions Gratuites
         this.addFreeVocationalConsultations(3);
         break;
-      case '2': // 1 Análisis Premium - ACCESO COMPLETO
+      case '2': // 1 Analyse Premium - ACCÈS COMPLET
         this.hasUserPaidForVocational = true;
-        sessionStorage.setItem('hasUserPaidForVocational', 'true');
+        sessionStorage.setItem('hasUserPaidForVocational_berufskarte', 'true');
 
-        // Desbloquear cualquier mensaje bloqueado
         if (this.blockedMessageId) {
           this.blockedMessageId = null;
           sessionStorage.removeItem('vocationalBlockedMessageId');
         }
 
-        // Agregar mensaje especial para este premio
         const premiumMessage: ChatMessage = {
           sender: this.counselorInfo.name,
           content:
-            "✨ **Vous avez débloqué l'accès Premium complet !** ✨\n\nLe destin professionnel vous a souri de manière extraordinaire. Vous avez maintenant un accès illimité à toute mon expertise en orientation professionnelle. Vous pouvez consulter autant de fois que vous le souhaitez sur votre vocation, les évaluations professionnelles et tous les aspects de votre avenir professionnel.\n\n🎯 *Les portes de votre chemin professionnel se sont entièrement ouvertes* 🎯",
+            "✨ **Vous avez débloqué l'accès Premium complet !** ✨\n\nLe destin professionnel vous a souri de manière extraordinaire. Vous avez maintenant un accès illimité à toute mon expérience en orientation professionnelle. Vous pouvez consulter sur votre vocation, les évaluations de carrière et tous les aspects de votre avenir professionnel autant de fois que vous le souhaitez.\n\n🎯 *Les portes de votre chemin professionnel se sont complètement ouvertes* 🎯",
           timestamp: new Date(),
           isUser: false,
         };
@@ -662,8 +702,7 @@ export class MapaVocacionalComponent
         this.shouldAutoScroll = true;
         this.saveMessagesToSession();
         break;
-      // ✅ ELIMINADO: case '3' - 2 Consultas Extra
-      case '4': // Otra oportunidad
+      case '4': // Autre opportunité
         break;
       default:
     }
@@ -680,6 +719,17 @@ export class MapaVocacionalComponent
       this.blockedMessageId = null;
       sessionStorage.removeItem('vocationalBlockedMessageId');
     }
+
+    // Message informatif
+    const infoMessage: ChatMessage = {
+      sender: this.counselorInfo.name,
+      content: `✨ *Vous avez reçu ${count} consultations professionnelles gratuites* ✨\n\nVous avez maintenant **${newTotal}** consultations disponibles pour explorer votre avenir professionnel.`,
+      timestamp: new Date(),
+      isUser: false,
+    };
+    this.chatMessages.push(infoMessage);
+    this.shouldAutoScroll = true;
+    this.saveMessagesToSession();
   }
 
   private hasFreeVocationalConsultationsAvailable(): boolean {
@@ -713,31 +763,21 @@ export class MapaVocacionalComponent
     }
   }
 
-  debugVocationalWheel(): void {
-    this.showFortuneWheel = true;
-    this.cdr.markForCheck();
-  }
-
   async handlePaymentSubmit(): Promise<void> {
     this.isProcessingPayment = true;
     this.paymentError = null;
     this.cdr.markForCheck();
 
     try {
-      // Configurar datos de la orden con rutas específicas del servicio
       const orderData = {
         amount: '4.00',
         currency: 'EUR',
-        serviceName: 'Carte Vocationnelle',
+        serviceName: 'Carte Professionnelle',
         returnPath: '/carte-vocationnelle',
         cancelPath: '/carte-vocationnelle',
       };
 
-      // Iniciar el flujo de pago de PayPal (redirige al usuario)
       await this.paypalService.initiatePayment(orderData);
-
-      // El código después de esta línea NO se ejecutará porque
-      // el usuario será redirigido a PayPal
     } catch (error: any) {
       this.paymentError =
         error.message || "Erreur lors de l'initialisation du paiement PayPal.";
@@ -753,14 +793,13 @@ export class MapaVocacionalComponent
     this.cdr.markForCheck();
   }
 
-  // AGREGADO - Métodos para control de tiempo
   getTimeString(timestamp: Date | string): string {
     try {
       const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
       if (isNaN(date.getTime())) {
         return 'N/A';
       }
-      return date.toLocaleTimeString('de-DE', {
+      return date.toLocaleTimeString('fr-FR', {
         hour: '2-digit',
         minute: '2-digit',
       });
@@ -769,14 +808,12 @@ export class MapaVocacionalComponent
     }
   }
 
-  // AGREGADO - Auto resize para textarea
   autoResize(event: any): void {
     const textarea = event.target;
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   }
 
-  // AGREGADO - Manejar Enter
   onKeyPress(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -786,7 +823,7 @@ export class MapaVocacionalComponent
 
   addMessage(message: ChatMessage): void {
     this.chatMessages.push(message);
-    this.shouldAutoScroll = true; // MODIFICADO
+    this.shouldAutoScroll = true;
     setTimeout(() => this.scrollToBottom(), 100);
   }
 
@@ -794,17 +831,11 @@ export class MapaVocacionalComponent
     if (!content) return '';
 
     let formattedContent = content;
-
-    // Convertir **texto** a <strong>texto</strong> para negrilla
     formattedContent = formattedContent.replace(
       /\*\*(.*?)\*\*/g,
       '<strong>$1</strong>'
     );
-
-    // Convertir saltos de línea a <br> para mejor visualización
     formattedContent = formattedContent.replace(/\n/g, '<br>');
-
-    // Opcional: También puedes manejar *texto* (una sola asterisco) como cursiva
     formattedContent = formattedContent.replace(
       /(?<!\*)\*([^*\n]+)\*(?!\*)/g,
       '<em>$1</em>'
@@ -813,7 +844,6 @@ export class MapaVocacionalComponent
     return formattedContent;
   }
 
-  // Personal info methods
   togglePersonalForm(): void {
     this.showPersonalForm = !this.showPersonalForm;
   }
@@ -824,14 +854,13 @@ export class MapaVocacionalComponent
     if (Object.keys(this.personalInfo).length > 0) {
       this.addMessage({
         sender: this.counselorInfo.name,
-        content: `Parfait, j'ai enregistré vos informations personnelles. Cela m'aidera à vous offrir une orientation plus précise et personnalisée. Y a-t-il quelque chose de spécial concernant votre avenir professionnel qui vous préoccupe ou vous enthousiasme ?`,
+        content: `Parfait, j'ai enregistré vos informations personnelles. Cela m'aidera à vous fournir une orientation plus précise et personnalisée. Y a-t-il quelque chose de spécifique concernant votre avenir professionnel qui vous préoccupe ou vous enthousiasme ?`,
         timestamp: new Date(),
         isUser: false,
       });
     }
   }
 
-  // Assessment methods
   loadAssessmentQuestions(): void {
     this.vocationalService.getAssessmentQuestions().subscribe({
       next: (questions) => {
@@ -840,6 +869,7 @@ export class MapaVocacionalComponent
         this.cdr.markForCheck();
       },
       error: (error) => {
+        console.error('Erreur lors du chargement des questions :', error);
         this.cdr.markForCheck();
       },
     });
@@ -855,7 +885,6 @@ export class MapaVocacionalComponent
 
   nextQuestion(): void {
     if (this.selectedOption && this.currentQuestion) {
-      // Guardar respuesta
       this.assessmentAnswers[this.currentQuestionIndex] = {
         question: this.currentQuestion.question,
         answer: this.selectedOption,
@@ -890,7 +919,6 @@ export class MapaVocacionalComponent
 
   finishAssessment(): void {
     if (this.selectedOption && this.currentQuestion) {
-      // Guardar última respuesta
       this.assessmentAnswers[this.currentQuestionIndex] = {
         question: this.currentQuestion.question,
         answer: this.selectedOption,
@@ -900,7 +928,6 @@ export class MapaVocacionalComponent
           )?.category || '',
       };
 
-      // Analizar resultados
       this.analyzeResults();
     }
   }
@@ -914,6 +941,7 @@ export class MapaVocacionalComponent
         this.cdr.markForCheck();
       },
       error: (error) => {
+        console.error("Erreur lors de l'analyse des résultats :", error);
         this.cdr.markForCheck();
       },
     });
@@ -930,7 +958,6 @@ export class MapaVocacionalComponent
     this.switchTab('assessment');
   }
 
-  // Utility methods
   getCategoryEmoji(category: string): string {
     return this.vocationalService.getCategoryEmoji(category);
   }
@@ -947,83 +974,77 @@ export class MapaVocacionalComponent
       }
     } catch (err) {}
   }
+
   onUserDataSubmitted(userData: any): void {
-    // ✅ VALIDAR CAMPOS CRÍTICOS ANTES DE PROCEDER
-    const requiredFields = ['email']; // ❌ QUITADO 'apellido'
+    const requiredFields = ['email'];
     const missingFields = requiredFields.filter(
       (field) => !userData[field] || userData[field].toString().trim() === ''
     );
 
     if (missingFields.length > 0) {
       alert(
-        `Pour continuer le paiement, vous devez remplir les champs suivants : ${missingFields.join(
+        `Pour continuer avec le paiement, vous devez compléter les champs suivants : ${missingFields.join(
           ', '
         )}`
       );
-      this.showDataModal = true; // Mantener modal abierto
+      this.showDataModal = true;
       this.cdr.markForCheck();
       return;
     }
 
-    // ✅ LIMPIAR Y GUARDAR datos INMEDIATAMENTE en memoria Y sessionStorage
     this.userData = {
       ...userData,
       email: userData.email?.toString().trim(),
     };
 
-    // ✅ GUARDAR EN sessionStorage INMEDIATAMENTE
     try {
       sessionStorage.setItem('userData', JSON.stringify(this.userData));
-
-      // Verificar que se guardaron correctamente
-      const verificacion = sessionStorage.getItem('userData');
-    } catch (error) {}
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de userData :', error);
+    }
 
     this.showDataModal = false;
     this.cdr.markForCheck();
 
-    // ✅ NUEVO: Enviar datos al backend como en otros componentes
     this.sendUserDataToBackend(userData);
   }
+
   private sendUserDataToBackend(userData: any): void {
     this.http.post(`${environment.apiUrl}api/recolecta`, userData).subscribe({
       next: (response) => {
-        // Llamar a promptForPayment
+        console.log('Données envoyées au backend :', response);
         this.promptForPayment();
       },
       error: (error) => {
-        // Aun así abrir el modal de pago
+        console.error("Erreur lors de l'envoi des données :", error);
         this.promptForPayment();
       },
     });
   }
+
   onDataModalClosed(): void {
     this.showDataModal = false;
     this.cdr.markForCheck();
   }
+
+  // ✅ MODIFIÉ : resetChat() incluant le compteur
   resetChat(): void {
-    // 1. Reset de arrays y mensajes
     this.chatMessages = [];
     this.currentMessage = '';
-
-    // 2. Reset de estados de carga
     this.isLoading = false;
-
-    // 3. Reset de estados de pago y bloqueo
-    this.firstQuestionAsked = false;
     this.blockedMessageId = null;
 
-    // 4. Reset de modales
+    // ✅ Réinitialiser le compteur de messages
+    this.userMessageCount = 0;
+
     this.showPaymentModal = false;
     this.showDataModal = false;
     this.showFortuneWheel = false;
     this.showPersonalForm = false;
 
-    // 5. Reset de variables de scroll y contadores
     this.shouldAutoScroll = true;
     this.lastMessageCount = 0;
 
-    // 6. Reset del assessment
     this.currentQuestionIndex = 0;
     this.selectedOption = '';
     this.assessmentAnswers = [];
@@ -1031,28 +1052,24 @@ export class MapaVocacionalComponent
     this.assessmentResults = null;
     this.hasAssessmentResults = false;
 
-    // 7. Reset de información personal
     this.personalInfo = {};
 
-    // 8. Reset de payment
     this.isProcessingPayment = false;
     this.paymentError = null;
 
-    // 9. Limpiar timers
     if (this.wheelTimer) {
       clearTimeout(this.wheelTimer);
     }
 
-    // 10. Limpiar sessionStorage específico vocacional (pero NO userData)
+    // ✅ Nettoyer sessionStorage incluant le compteur
     sessionStorage.removeItem('vocationalMessages');
-    sessionStorage.removeItem('vocationalFirstQuestionAsked');
     sessionStorage.removeItem('vocationalBlockedMessageId');
+    sessionStorage.removeItem('vocationalUserMessageCount');
     sessionStorage.removeItem('pendingVocationalMessage');
+    sessionStorage.removeItem('freeVocationalConsultations');
 
-    // 11. Reset a pestaña principal
     this.currentTab = 'chat';
 
-    // 12. Reinicializar mensaje de bienvenida
     this.initializeWelcomeMessage();
     this.cdr.markForCheck();
   }
